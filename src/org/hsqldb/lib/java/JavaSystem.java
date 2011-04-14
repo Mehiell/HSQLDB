@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.lib.java;
-
+/*Peter comment*/
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;

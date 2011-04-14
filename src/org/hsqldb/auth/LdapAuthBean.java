@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.auth;
-
+/*Peter comment*/
 import java.io.IOException;
 import java.io.File;
 import java.io.FileInputStream;

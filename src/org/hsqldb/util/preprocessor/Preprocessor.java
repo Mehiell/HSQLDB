@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.util.preprocessor;
-
+/*Peter comment*/
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;

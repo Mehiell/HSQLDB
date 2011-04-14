@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.persist;
-
+/*Peter comment*/
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;

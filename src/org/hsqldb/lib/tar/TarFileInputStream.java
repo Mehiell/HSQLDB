@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.lib.tar;
-
+/*Peter comment*/
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;

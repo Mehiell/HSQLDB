@@ -32,7 +32,7 @@
 package org.hsqldb.lib.tar;
 
 import org.hsqldb.lib.StringUtil;
-
+/*Peter comment*/
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.persist;
-
+/*Peter comment*/
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;

@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.lib;
-
+/*Peter comment*/
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;

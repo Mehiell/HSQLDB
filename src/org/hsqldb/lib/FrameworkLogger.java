@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.lib;
-
+/*Peter comment*/
 import java.util.Enumeration;
 import java.util.logging.Level;
 import java.util.logging.ConsoleHandler;

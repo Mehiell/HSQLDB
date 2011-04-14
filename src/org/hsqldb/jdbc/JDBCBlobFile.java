@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.jdbc;
-
+/*Peter comment*/
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;

@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.util;
-
+/*Peter comment*/
 import java.applet.Applet;
 import java.io.File;
 import java.io.IOException;
