@@ -30,11 +30,12 @@
 
 
 package org.hsqldb.util;
-/*Peter comment*/
-import java.io.File;
-import java.io.FileOutputStream;
+
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+
+import org.apache.commons.vfs.FileObject;
 
 /**
  * helper class to write table data to a csv-file (comma separated values).
@@ -60,15 +61,15 @@ public class CSVWriter {
      * @param file the file to write data to
      * @param encoding encoding to use or null (=defualt)
      */
-    public CSVWriter(File file, String encoding) throws IOException {
+    public CSVWriter(FileObject file, String encoding) throws IOException {
 
         if (encoding == null) {
             encoding = System.getProperty("file.encoding");
         }
 
-        FileOutputStream fout = new FileOutputStream(file);
+        OutputStream os = file.getContent().getOutputStream();
 
-        writer = new OutputStreamWriter(fout, encoding);
+        writer = new OutputStreamWriter(os, encoding);
     }
 
     /**

@@ -30,11 +30,10 @@
 
 
 package org.hsqldb.util;
-/*Peter comment*/
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
+
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Enumeration;
@@ -42,6 +41,8 @@ import java.util.Hashtable;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 import java.util.Vector;
+
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * @author Nicolas BAZIN, INGENICO
@@ -73,7 +74,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextWrite == null) {
             try {
-                WTextWrite = new BufferedWriter(new FileWriter(sFileName));
+                WTextWrite = new BufferedWriter(new java.io.OutputStreamWriter(GAEFileManager.getFile(sFileName).getContent().getOutputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }
@@ -100,7 +101,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextWrite == null) {
             try {
-                WTextWrite = new BufferedWriter(new FileWriter(sFileName));
+                WTextWrite = new BufferedWriter(new java.io.OutputStreamWriter(GAEFileManager.getFile(sFileName).getContent().getOutputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }
@@ -166,7 +167,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextWrite == null) {
             try {
-                WTextWrite = new BufferedWriter(new FileWriter(sFileName));
+                WTextWrite = new BufferedWriter(new java.io.OutputStreamWriter(GAEFileManager.getFile(sFileName).getContent().getOutputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }
@@ -375,7 +376,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextRead == null) {
             try {
-                WTextRead = new BufferedReader(new FileReader(sFileName));
+                WTextRead = new BufferedReader(new java.io.InputStreamReader(GAEFileManager.getFile(sFileName).getContent().getInputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }
@@ -442,7 +443,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextRead == null) {
             try {
-                WTextRead = new BufferedReader(new FileReader(sFileName));
+                WTextRead = new BufferedReader(new java.io.InputStreamReader(GAEFileManager.getFile(sFileName).getContent().getInputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }
@@ -703,7 +704,7 @@ class TransferSQLText extends DataAccessPoint {
 
         if (WTextRead == null) {
             try {
-                WTextRead = new BufferedReader(new FileReader(sFileName));
+                WTextRead = new BufferedReader(new java.io.InputStreamReader(GAEFileManager.getFile(sFileName).getContent().getInputStream()));
             } catch (IOException e) {
                 throw new DataAccessPointException(e.getMessage());
             }

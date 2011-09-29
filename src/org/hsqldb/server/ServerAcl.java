@@ -30,10 +30,9 @@
 
 
 package org.hsqldb.server;
-/*Peter comment*/
+
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -43,6 +42,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
+import org.apache.commons.vfs.FileSystemManager;
+import org.apache.commons.vfs.FileType;
+
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.store.BitMap;
 
 /**
@@ -335,23 +340,23 @@ public final class ServerAcl {
         pw.flush();
     }
 
-    private File aclFile;
+    private FileObject aclFile;
     private long lastLoadTime = 0;
 
     private static final class InternalException extends Exception {}
 
-    public ServerAcl(File aclFile) throws IOException, AclFormatException {
+    public ServerAcl(FileObject aclFile) throws IOException, AclFormatException {
         this.aclFile = aclFile;
         aclEntries   = load();
     }
 
     synchronized protected void ensureAclsUptodate() {
-
-        if (lastLoadTime > aclFile.lastModified()) {
-            return;
-        }
-
-        try {
+    	
+    	 try {
+    		 
+	        if (lastLoadTime > aclFile.getContent().getLastModifiedTime()) {
+	            return;
+	        }
             aclEntries = load();
 
             println("ACLs reloaded from file");
@@ -365,17 +370,17 @@ public final class ServerAcl {
     protected List load() throws IOException, AclFormatException {
 
         if (!aclFile.exists()) {
-            throw new IOException("File '" + aclFile.getAbsolutePath()
+            throw new IOException("File '" + aclFile.getName().getPath()
                                   + "' is not present");
         }
 
-        if (!aclFile.isFile()) {
-            throw new IOException("'" + aclFile.getAbsolutePath()
+        if (!aclFile.getType().equals(FileType.FILE)) {
+            throw new IOException("'" + aclFile.getName().getPath()
                                   + "' is not a regular file");
         }
 
-        if (!aclFile.canRead()) {
-            throw new IOException("'" + aclFile.getAbsolutePath()
+        if (!aclFile.isReadable()) {
+            throw new IOException("'" + aclFile.getName().getPath()
                                   + "' is not accessible");
         }
 
@@ -389,7 +394,7 @@ public final class ServerAcl {
         byte[]          addr;
         boolean         allow;
         int             bits;
-        BufferedReader  br      = new BufferedReader(new FileReader(aclFile));
+        BufferedReader  br      = new BufferedReader(new InputStreamReader(aclFile.getContent().getInputStream()));
         List            newAcls = new ArrayList();
 
         try {
@@ -443,11 +448,11 @@ public final class ServerAcl {
                     }
                 } catch (NumberFormatException nfe) {
                     throw new AclFormatException("Syntax error at ACL file '"
-                                                 + aclFile.getAbsolutePath()
+                                                 + aclFile.getName().getPath()
                                                  + "', line " + linenum);
                 } catch (InternalException ie) {
                     throw new AclFormatException("Syntax error at ACL file '"
-                                                 + aclFile.getAbsolutePath()
+                                                 + aclFile.getName().getPath()
                                                  + "', line " + linenum);
                 }
 
@@ -455,7 +460,7 @@ public final class ServerAcl {
                     newAcls.add(new AclEntry(addr, bits, allow));
                 } catch (AclFormatException afe) {
                     throw new AclFormatException("Syntax error at ACL file '"
-                                                 + aclFile.getAbsolutePath()
+                                                 + aclFile.getName().getPath()
                                                  + "', line " + linenum + ": "
                                                  + afe.toString());
                 }
@@ -497,7 +502,7 @@ public final class ServerAcl {
             System.exit(0);
         }
 
-        ServerAcl serverAcl = new ServerAcl(new File((sa.length == 0)
+        ServerAcl serverAcl = new ServerAcl(GAEFileManager.getFile((sa.length == 0)
             ? "acl.txt"
             : sa[0]));
 

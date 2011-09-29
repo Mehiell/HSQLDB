@@ -31,11 +31,13 @@
 
 package org.hsqldb.lib.tar;
 /*Peter comment*/
-import java.io.File;
-import java.io.FileInputStream;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
+
+import org.apache.commons.vfs.FileObject;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * Works with tar archives containing HSQLDB database instance backups.
@@ -172,18 +174,22 @@ public class DbBackup {
      * Much validation is deferred until the write() method, to prevent
      * problems with files changing between the constructor and the write call.
      */
-    public DbBackup(File archiveFile, String dbPath) {
+    public DbBackup(FileObject archiveFile, String dbPath) {
 
         this.archiveFile = archiveFile;
-
-        File dbPathFile = new File(dbPath);
-
-        dbDir        = dbPathFile.getAbsoluteFile().getParentFile();
-        instanceName = dbPathFile.getName();
+        try {
+	        FileObject dbPathFile = GAEFileManager.getFile(dbPath);
+	        dbDir        = dbPathFile.getParent();
+	        instanceName = dbPathFile.getName().getBaseName();
+        } catch(Exception e)
+        {
+        	
+        }
+        
     }
 
-    protected File    dbDir;
-    protected File    archiveFile;
+    protected FileObject    dbDir;
+    protected FileObject    archiveFile;
     protected String  instanceName;
     protected boolean overWrite       = false;    // Defaults no NO OVERWRITE
     protected boolean abortUponModify = true;     // Defaults to ABORT-UPON-MODIFY
@@ -230,11 +236,11 @@ public class DbBackup {
      */
     public void write() throws IOException, TarMalformatException {
 
-        File   propertiesFile = new File(dbDir, instanceName + ".properties");
-        File   scriptFile     = new File(dbDir, instanceName + ".script");
-        File[] componentFiles = new File[] {
+        FileObject   propertiesFile = new File(dbDir, instanceName + ".properties");
+        FileObject   scriptFile     = new File(dbDir, instanceName + ".script");
+        FileObject[] componentFiles = new FileObject[] {
             propertiesFile, scriptFile,
-            new File(dbDir, instanceName + ".backup"),
+            new FileObject(dbDir, instanceName + ".backup"),
             new File(dbDir, instanceName + ".data"),
             new File(dbDir, instanceName + ".log"),
             new File(dbDir, instanceName + ".lobs")
@@ -373,17 +379,17 @@ public class DbBackup {
      * @param files  Null array elements are permitted.  They will just be
      *               skipped by the algorithm.
      */
-    static protected int generateBufferBlockValue(File[] files) {
+    static protected int generateBufferBlockValue(FileObject[] files) {
 
         long maxFileSize = 0;
 
-        for (File file : files) {
+        for (FileObject file : files) {
             if (file == null) {
                 continue;
             }
 
-            if (file.length() > maxFileSize) {
-                maxFileSize = file.length();
+            if (file.getContent().getSize() > maxFileSize) {
+                maxFileSize = file.getContent().getSize() ;
             }
         }
 
@@ -407,7 +413,7 @@ public class DbBackup {
      *
      * @see #generateBufferBlockValue(File[])
      */
-    static protected int generateBufferBlockValue(File file) {
-        return generateBufferBlockValue(new File[]{ file });
+    static protected int generateBufferBlockValue(FileObject file) {
+        return generateBufferBlockValue(new FileObject[]{ file });
     }
 }

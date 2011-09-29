@@ -30,10 +30,8 @@
 
 
 package org.hsqldb.lib;
-/*Peter comment*/
-import java.io.File;
+
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -41,6 +39,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Random;
 
+import org.apache.commons.vfs.FileObject;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.java.JavaSystem;
 
 /**
@@ -71,21 +71,32 @@ public class FileUtil implements FileAccess {
     }
 
     public boolean isStreamElement(java.lang.String elementName) {
-        return (new File(elementName)).exists();
+    	try {
+    		return (GAEFileManager.getFile(elementName)).exists();
+    	}	catch(Exception ee)
+    	{
+    		return false;
+    	}
     }
 
     public InputStream openInputStreamElement(java.lang.String streamName)
     throws java.io.IOException {
 
         try {
-            return new FileInputStream(new File(streamName));
+            return GAEFileManager.getFile(streamName).getContent().getInputStream();
         } catch (Throwable e) {
             throw JavaSystem.toIOException(e);
         }
     }
 
     public void createParentDirs(String filename) {
-        makeParentDirectories(new File(filename));
+    	try {
+    		makeParentDirectories(GAEFileManager.getFile(filename));
+    	}	catch(Exception ee)
+    	{
+    		return;
+    	}
+        
     }
 
     public void removeElement(String filename) {
@@ -102,7 +113,7 @@ public class FileUtil implements FileAccess {
 
     public java.io.OutputStream openOutputStreamElement(
             java.lang.String streamName) throws java.io.IOException {
-        return new FileOutputStream(new File(streamName));
+        return GAEFileManager.getFile(streamName).getContent().getOutputStream();
     }
 
     // end of FileAccess implementation
@@ -114,13 +125,13 @@ public class FileUtil implements FileAccess {
     // even if, unlike for File.getCanonicalPath(), (new File("a")).exists() or
     // (new File("A")).exits(), regardless of the hosting system's
     // file path case sensitivity policy.
-    public final boolean fsIsIgnoreCase =
-        (new File("A")).equals(new File("a"));
+    public final boolean fsIsIgnoreCase = false;
+        //(GAEFileManager.getFile("A")).equals(GAEFileManager.getFile("a"));
 
     // posix separator normalized to File.separator?
     // CHECKME: is this true for every file system under Java?
-    public final boolean fsNormalizesPosixSeparator =
-        (new File("/")).getPath().endsWith(File.separator);
+    public final boolean fsNormalizesPosixSeparator = true;
+        //(GAEFileManager.getFile("/").getName().getPath().endsWith("/"));
 
     // for JDK 1.1 createTempFile
     final Random random = new Random(System.currentTimeMillis());
@@ -129,7 +140,12 @@ public class FileUtil implements FileAccess {
      * Delete the named file
      */
     public boolean delete(String filename) {
-        return (new File(filename)).delete();
+    	try {
+    		return (GAEFileManager.getFile(filename)).delete();
+    	} catch(Exception e) {
+    		return false;
+    	}
+    	 
     }
 
     /**
@@ -147,15 +163,23 @@ public class FileUtil implements FileAccess {
      * @param f the abstract pathname of the file be deleted when the virtual
      *       machine terminates
      */
-    public void deleteOnExit(File f) {
-        JavaSystem.deleteOnExit(f);
+    public void deleteOnExit(FileObject f) {
+    	try {
+    		f.delete();
+    	} catch(Exception e) {
+    		//return false;
+    	}
     }
 
     /**
      * Return true or false based on whether the named file exists.
      */
     public boolean exists(String filename) {
-        return (new File(filename)).exists();
+    	try {
+    		return (GAEFileManager.getFile(filename)).exists();
+    	} catch(Exception e) {
+    		return false;
+    	}    	
     }
 
     public boolean exists(String fileName, boolean resource, Class cla) {
@@ -176,19 +200,23 @@ public class FileUtil implements FileAccess {
      * operation.
      */
     private boolean renameWithOverwrite(String oldname, String newname) {
-
-        File    file    = new File(oldname);
-        boolean renamed = file.renameTo(new File(newname));
-
-        if (renamed) {
-            return true;
-        }
-
-        if (delete(newname)) {
-            return file.renameTo(new File(newname));
-        }
-
-        return false;
+    	
+    	boolean renamed = false;
+    	try {
+    		FileObject    file    = GAEFileManager.getFile(oldname);
+    		FileObject    newfile    = GAEFileManager.getFile(newname);
+    		renamed =  file.canRenameTo(newfile);
+    		
+    		 if (renamed) {
+    	            return true;
+    	        }
+    		 if (delete(newname)) {
+    	            return file.canRenameTo(newfile);
+    	        }
+    	} catch(Exception e) {
+    		return false;
+    	}    	
+    	return false;
     }
 
     /**
@@ -198,7 +226,11 @@ public class FileUtil implements FileAccess {
      * @return the absolute path
      */
     public String absolutePath(String path) {
-        return (new File(path)).getAbsolutePath();
+    	try {
+    		return (GAEFileManager.getFile(path)).getURL().toString();
+    	} catch(Exception e) {
+    		return path;
+    	}    	
     }
 
     /**
@@ -208,8 +240,8 @@ public class FileUtil implements FileAccess {
      * @param f the File for which to retrieve the absolute File
      * @return the canonical File
      */
-    public File canonicalFile(File f) throws IOException {
-        return new File(f.getCanonicalPath());
+    public FileObject canonicalFile(FileObject f) throws IOException {
+        return f;
     }
 
     /**
@@ -219,8 +251,8 @@ public class FileUtil implements FileAccess {
      * @param path the path for which to retrieve the canonical File
      * @return the canonical File
      */
-    public File canonicalFile(String path) throws IOException {
-        return new File(new File(path).getCanonicalPath());
+    public FileObject canonicalFile(String path) throws IOException {
+    	return GAEFileManager.getFile(path);
     }
 
     /**
@@ -230,8 +262,8 @@ public class FileUtil implements FileAccess {
      * @param f the File for which to retrieve the canonical path
      * @return the canonical path
      */
-    public String canonicalPath(File f) throws IOException {
-        return f.getCanonicalPath();
+    public String canonicalPath(FileObject f) throws IOException {
+        return f.getName().getPath();
     }
 
     /**
@@ -242,7 +274,7 @@ public class FileUtil implements FileAccess {
      * @return the canonical path
      */
     public String canonicalPath(String path) throws IOException {
-        return new File(path).getCanonicalPath();
+        return canonicalPath(GAEFileManager.getFile(path));
     }
 
     /**
@@ -262,38 +294,35 @@ public class FileUtil implements FileAccess {
         }
     }
 
-    public void makeParentDirectories(File f) {
+    public void makeParentDirectories(FileObject f) {
+    	 try {
+    		 FileObject parent = f.getParent();
 
-        String parent = f.getParent();
-
-        if (parent != null) {
-            new File(parent).mkdirs();
-        } else {
-
-            // workaround for jdk 1.1 bug (returns null when there is a parent)
-            parent = f.getPath();
-
-            int index = parent.lastIndexOf('/');
-
-            if (index > 0) {
-                parent = parent.substring(0, index);
-
-                new File(parent).mkdirs();
-            }
-        }
+    	        if (parent != null && !parent.exists()) {
+    	        	parent.createFolder();
+    	        }
+    	 } catch (Exception e) {
+            return;
+         }
+    	
+        
     }
 
     public static String makeDirectories(String path) {
-
-        try {
-            File file = new File(path);
-
-            file.mkdirs();
-
-            return file.getCanonicalPath();
-        } catch (IOException e) {
-            return null;
+    	try {
+    		
+    		FileObject f =	GAEFileManager.getFile(path);
+   		 	
+    		if (f != null && !f.exists()) {
+   	        	f.createFolder();
+   	        }
+    		
+    		return f.getName().getPath();
+   	 } catch (Exception e) {
+           return null;
         }
+    	
+        
     }
 
     public FileAccess.FileSync getFileSync(java.io.OutputStream os)

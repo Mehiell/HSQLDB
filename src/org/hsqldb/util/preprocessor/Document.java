@@ -30,12 +30,10 @@
 
 
 package org.hsqldb.util.preprocessor;
-/*Peter comment*/
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -45,6 +43,11 @@ import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.Vector;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
+import org.apache.commons.vfs.FileSystemManager;
+import org.hsqldb.gae.GAEFileManager;
 
 /* $Id: Document.java 610 2008-12-22 15:54:18Z unsaved $ */
 
@@ -186,8 +189,8 @@ class Document {
                     : new InputStreamReader(is);
 
             reader = new BufferedReader(isr);
-        } else if (source instanceof File) {
-            InputStream       is  = new FileInputStream((File) source);
+        } else if (source instanceof FileObject) {
+            InputStream       is  = ((FileObject) source).getContent().getInputStream();
             InputStreamReader isr = isEncoding(encoding)
                     ? new InputStreamReader(is, encoding)
                     : new InputStreamReader(is);
@@ -195,7 +198,7 @@ class Document {
             close  = true;
             reader = new BufferedReader(isr);
         } else if (source instanceof String) {
-            InputStream       is  = new FileInputStream((String) source);
+            InputStream       is  = GAEFileManager.getFile((String) source).getContent().getInputStream();
             InputStreamReader isr = isEncoding(encoding)
                     ? new InputStreamReader(is, encoding)
                     : new InputStreamReader(is);
@@ -241,8 +244,8 @@ class Document {
                     : new OutputStreamWriter(os);
 
             writer = new BufferedWriter(osr);
-        } else if (target instanceof File) {
-            OutputStream       os  = new FileOutputStream((File) target);
+        } else if (target instanceof FileObject) {
+            OutputStream       os  = ((FileObject) target).getContent().getOutputStream();
             OutputStreamWriter osr = isEncoding(encoding)
                     ? new OutputStreamWriter(os, encoding)
                     : new OutputStreamWriter(os);
@@ -250,7 +253,7 @@ class Document {
             close  = true;
             writer = new BufferedWriter(osr);
         } else if (target instanceof String) {
-            OutputStream       os  = new FileOutputStream((String) target);
+            OutputStream       os  = GAEFileManager.getFile((String) target).getContent().getOutputStream();
             OutputStreamWriter osr = isEncoding(encoding)
                     ? new OutputStreamWriter(os, encoding)
                     : new OutputStreamWriter(os);

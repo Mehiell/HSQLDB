@@ -30,15 +30,18 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
+
 import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+
 import java.lang.reflect.Constructor;
 
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 import org.hsqldb.Database;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.HsqlByteArrayInputStream;
 import org.hsqldb.lib.HsqlByteArrayOutputStream;
 
@@ -66,7 +69,7 @@ final class ScaledRAFile implements RandomAccessInterface {
 
     //
     final Database                  database;
-    final RandomAccessFile          file;
+    final RandomAccessContent          file;
     final FileDescriptor            fileDescriptor;
     private final boolean           readOnly;
     final String                    fileName;
@@ -159,13 +162,14 @@ final class ScaledRAFile implements RandomAccessInterface {
                                      : extendLength ? "rw"
                                                     : "rws";
 
-        this.file      = new RandomAccessFile(name, accessMode);
+        this.file      = GAEFileManager.getFile(name).getContent().getRandomAccessContent(readonly?RandomAccessMode.READ:RandomAccessMode.READWRITE);         		
         buffer         = new byte[bufferSize];
         ba             = new HsqlByteArrayInputStream(buffer);
         valueBuffer    = new byte[8];
         vbao           = new HsqlByteArrayOutputStream(valueBuffer);
         vbai           = new HsqlByteArrayInputStream(valueBuffer);
-        fileDescriptor = file.getFD();
+        //fileDescriptor = file.getFD();
+        fileDescriptor = null;
         fileLength     = length();
 
         readIntoBuffer();

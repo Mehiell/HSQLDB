@@ -30,9 +30,9 @@
 
 
 package org.hsqldb.util.preprocessor;
-/*Peter comment*/
-import java.io.File;
-import java.io.IOException;
+
+import org.apache.commons.vfs.FileObject;
+import org.hsqldb.gae.GAEFileManager;
 
 /* $Id: BasicResolver.java 610 2008-12-22 15:54:18Z unsaved $ */
 
@@ -44,18 +44,20 @@ import java.io.IOException;
  * @since 1.8.1
  */
 class BasicResolver implements IResolver {
-    File parentDir;
+    FileObject parentDir;
 
-    public BasicResolver(File parentDir) {
+    public BasicResolver(FileObject parentDir) {
         this.parentDir = parentDir;
     }
 
     public String resolveProperties(String expression) {
         return expression;
     }
-    public File resolveFile(String path) {
-        File file = new File(path);
-
+    
+    public FileObject resolveFile(String path) {
+    	 try {
+    		 FileObject file = GAEFileManager.getFile(path);
+    	/*
         if (parentDir != null && !file.isAbsolute()) {
             try {
                 path = this.parentDir.getCanonicalPath()
@@ -71,11 +73,13 @@ class BasicResolver implements IResolver {
                 file = new File(path);
             }
         }
-
-        try {
-            return file.getCanonicalFile();
+	*/
+       
+    		 return file;
         } catch (Exception e) {
-            return file.getAbsoluteFile();
+            
         }
+    	 
+    	 return null;
     }
 }

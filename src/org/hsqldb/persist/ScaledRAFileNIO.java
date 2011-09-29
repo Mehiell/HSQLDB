@@ -30,17 +30,19 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
-import java.io.IOException;
-import java.io.RandomAccessFile;
+
 import java.io.FileDescriptor;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 import org.hsqldb.Database;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * New NIO version of ScaledRAFile. This class is used only for storing a CACHED
@@ -60,7 +62,7 @@ final class ScaledRAFileNIO implements RandomAccessInterface {
     private final boolean    readOnly;
     private final long       maxLength;
     private long             fileLength;
-    private RandomAccessFile file;
+    private RandomAccessContent file;
     private FileDescriptor   fileDescriptor;
     private MappedByteBuffer buffer;
     private long             bufferPosition;
@@ -104,11 +106,10 @@ final class ScaledRAFileNIO implements RandomAccessInterface {
                     largeBufferScale);
         }
 
-        file                = new RandomAccessFile(name, readOnly ? "r"
-                                                                  : "rw");
+        file                = GAEFileManager.getFile(name).getContent().getRandomAccessContent(readOnly?RandomAccessMode.READ:RandomAccessMode.READWRITE);
         this.readOnly       = readOnly;
-        this.channel        = file.getChannel();
-        this.fileDescriptor = file.getFD();
+        //this.channel        = file.getChannel();
+        //this.fileDescriptor = file.getFD();
 
         if (ensureLength(requiredLength)) {
             buffer          = buffers[0];

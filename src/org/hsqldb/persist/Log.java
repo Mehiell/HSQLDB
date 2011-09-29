@@ -30,14 +30,15 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
-import java.io.File;
+
+
 import java.io.IOException;
 
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
 import org.hsqldb.Database;
 import org.hsqldb.DatabaseURL;
 import org.hsqldb.HsqlException;
-import org.hsqldb.HsqlNameManager;
 import org.hsqldb.HsqlNameManager.HsqlName;
 import org.hsqldb.NumberSequence;
 import org.hsqldb.Row;
@@ -46,6 +47,7 @@ import org.hsqldb.SqlInvariants;
 import org.hsqldb.Table;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.FileAccess;
 import org.hsqldb.lib.FileArchiver;
 import org.hsqldb.lib.HashMap;
@@ -769,15 +771,16 @@ public class Log {
                     HsqlDatabaseProperties.textdb_allow_full_path)) {
             if (source.indexOf("..") != -1) {
                 throw (Error.error(ErrorCode.ACCESS_IS_DENIED, source));
-            }
-
-            String path = new File(
-                new File(
-                    database.getPath()
-                    + ".properties").getAbsolutePath()).getParent();
-
-            if (path != null) {
-                source = path + File.separator + source;
+            }            
+            
+            try {
+	            FileObject f = GAEFileManager.getFile(database.getPath()  + ".properties");
+	            String path =  f.getParent().getName().getPath();
+	            if (path != null) {
+	                source = path + "/" + source;
+	            }
+            } catch (FileSystemException fsx) {
+            	 throw (Error.error(ErrorCode.ACCESS_IS_DENIED, source));
             }
         }
 
@@ -845,12 +848,12 @@ public class Log {
         }
 
         try {
-            File   file = new File(database.getCanonicalPath());
-            File[] list = file.getParentFile().listFiles();
-
+        	FileObject file = GAEFileManager.getFile(database.getCanonicalPath());
+        	FileObject[] list = file.getParent().getChildren();
+        	
             for (int i = 0; i < list.length; i++) {
-                if (list[i].getName().startsWith(file.getName())
-                        && list[i].getName().endsWith(
+                if (list[i].getName().getBaseName().startsWith(list[i].getName().getBaseName())
+                        && list[i].getName().getBaseName().endsWith(
                             Logger.oldFileExtension)) {
                     list[i].delete();
                 }
@@ -864,10 +867,10 @@ public class Log {
             if (database.logger.tempDirectoryPath == null) {
                 return;
             }
-
-            File   file = new File(database.logger.tempDirectoryPath);
-            File[] list = file.listFiles();
-
+            
+            FileObject file = GAEFileManager.getFile(database.logger.tempDirectoryPath);
+        	FileObject[] list = file.getParent().getChildren();
+        	
             for (int i = 0; i < list.length; i++) {
                 list[i].delete();
             }

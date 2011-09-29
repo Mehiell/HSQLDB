@@ -30,7 +30,7 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
+
 import java.io.DataInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;

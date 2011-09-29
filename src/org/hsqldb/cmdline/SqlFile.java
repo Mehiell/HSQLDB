@@ -30,23 +30,22 @@
 
 
 package org.hsqldb.cmdline;
-/*Peter comment*/
+
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -55,27 +54,28 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import java.util.logging.Level;
-import java.lang.reflect.Method;
-import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.Charset;
-import org.hsqldb.lib.AppendableException;
-import org.hsqldb.lib.RCData;
-import org.hsqldb.lib.StringUtil;
-import org.hsqldb.lib.FrameworkLogger;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
+import org.hsqldb.cmdline.sqltool.SqlFileScanner;
 import org.hsqldb.cmdline.sqltool.Token;
 import org.hsqldb.cmdline.sqltool.TokenList;
 import org.hsqldb.cmdline.sqltool.TokenSource;
-import org.hsqldb.cmdline.sqltool.SqlFileScanner;
+import org.hsqldb.gae.GAEFileManager;
+import org.hsqldb.lib.AppendableException;
+import org.hsqldb.lib.FrameworkLogger;
+import org.hsqldb.lib.RCData;
+import org.hsqldb.lib.StringUtil;
 
 /* $Id: SqlFile.java 4141 2011-03-14 01:35:49Z fredt $ */
 
@@ -176,7 +176,7 @@ public class SqlFile {
     // Reader serves the auxiliary purpose of null meaning execute()
     // has finished.
     private String           inputStreamLabel;
-    private File             baseDir;
+    private FileObject             baseDir;
 
     static String            DEFAULT_FILE_ENCODING =
                              System.getProperty("file.encoding");
@@ -381,9 +381,9 @@ public class SqlFile {
      * Convenience wrapper for the SqlFile(File, String) constructor
      *
      * @throws IOException
-     * @see #SqlFile(File, String)
+     * @see #SqlFile(FileObject, String)
      */
-    public SqlFile(File inputFile) throws IOException {
+    public SqlFile(FileObject inputFile) throws IOException {
         this(inputFile, null);
     }
 
@@ -393,9 +393,9 @@ public class SqlFile {
      * @param encoding is applied to both the given File and other files
      *        read in or written out. Null will use your env+JVM settings.
      * @throws IOException
-     * @see #SqlFile(File, String, boolean)
+     * @see #SqlFile(FileObject, String, boolean)
      */
-    public SqlFile(File inputFile, String encoding) throws IOException {
+    public SqlFile(FileObject inputFile, String encoding) throws IOException {
         this(inputFile, encoding, false);
     }
 
@@ -409,14 +409,14 @@ public class SqlFile {
      *                     Special commands are enabled, and
      *                     continueOnError defaults to true.
      * @throws IOException
-     * @see #SqlFile(Reader, String, PrintStream, String, boolean, File)
+     * @see #SqlFile(Reader, String, PrintStream, String, boolean, FileObject)
      */
-    public SqlFile(File inputFile, String encoding, boolean interactive)
+    public SqlFile(FileObject inputFile, String encoding, boolean interactive)
             throws IOException {
-        this(new InputStreamReader(new FileInputStream(inputFile),
+        this(new InputStreamReader(inputFile.getContent().getInputStream(),
                 (encoding == null) ? DEFAULT_FILE_ENCODING : encoding),
                 inputFile.toString(), System.out, encoding, interactive,
-                inputFile.getParentFile());
+                inputFile.getParent());
     }
 
     /**
@@ -429,7 +429,7 @@ public class SqlFile {
      *                     Special commands are enabled, and
      *                     continueOnError defaults to true.
      * @throws IOException
-     * @see #SqlFile(Reader, String, PrintStream, String, boolean, File)
+     * @see #SqlFile(Reader, String, PrintStream, String, boolean, FileObject)
      */
     public SqlFile(String encoding, boolean interactive) throws IOException {
         this((encoding == null)
@@ -469,7 +469,7 @@ public class SqlFile {
      */
     public SqlFile(Reader reader, String inputStreamLabel,
             PrintStream psStd, String encoding, boolean interactive,
-            File baseDir) throws IOException {
+            FileObject baseDir) throws IOException {
         this(reader, inputStreamLabel, baseDir);
         try {
             shared = new SharedFields(psStd);
@@ -498,19 +498,19 @@ public class SqlFile {
      *
      * @see #SqlFile(SqlFile, Reader, String)
      */
-    private SqlFile(SqlFile parentSqlFile, File inputFile) throws IOException {
+    private SqlFile(SqlFile parentSqlFile, FileObject inputFile) throws IOException {
         this(parentSqlFile,
-                new InputStreamReader(new FileInputStream(inputFile),
+                new InputStreamReader(inputFile.getContent().getInputStream(),
                 (parentSqlFile.shared.encoding == null)
                 ? DEFAULT_FILE_ENCODING : parentSqlFile.shared.encoding),
-                inputFile.toString(), inputFile.getParentFile());
+                inputFile.toString(), inputFile.getParent());
     }
 
     /**
      * Constructor for recursion
      */
     private SqlFile(SqlFile parentSqlFile, Reader reader,
-            String inputStreamLabel, File baseDir) {
+            String inputStreamLabel, FileObject baseDir) {
         this(reader, inputStreamLabel, baseDir);
         try {
             recursed = true;
@@ -533,7 +533,7 @@ public class SqlFile {
     /**
      * Base Constructor which every other Constructor starts with
      */
-    private SqlFile(Reader reader, String inputStreamLabel, File baseDir) {
+    private SqlFile(Reader reader, String inputStreamLabel, FileObject baseDir) {
         logger.privlog(Level.FINER, "<init>ting SqlFile instance",
                 null, 2, FrameworkLogger.class);
         if (reader == null)
@@ -547,7 +547,12 @@ public class SqlFile {
         // execute() to block.
         this.reader = reader;
         this.inputStreamLabel = inputStreamLabel;
-        this.baseDir = (baseDir == null) ? new File(".") : baseDir;
+        try {
+        	this.baseDir = (baseDir == null) ? GAEFileManager.getFile(".") : baseDir;
+        } catch(Exception ee)
+        {
+        	
+        }
     }
 
     public void setConnection(Connection jdbcConn) {
@@ -1265,8 +1270,7 @@ public class SqlFile {
                 PrintWriter pw = null;
                 try {
                     pw = new PrintWriter(
-                            new OutputStreamWriter(
-                            new FileOutputStream(targetFile, true),
+                            new OutputStreamWriter(GAEFileManager.getFile(targetFile).getContent().getOutputStream(true),
                             (shared.encoding == null)
                             ? DEFAULT_FILE_ENCODING : shared.encoding)
                             // Appendmode so can append to an SQL script.
@@ -1493,12 +1497,12 @@ public class SqlFile {
                         throw new BadSpecial(
                                 SqltoolRB.dsv_targetfile_demand.getString());
                     }
-                    File dsvFile = new File((dsvTargetFile == null)
+                    FileObject dsvFile = GAEFileManager.getFile((dsvTargetFile == null)
                                             ? (tableName + ".dsv")
                                             : dereferenceAt(dsvTargetFile));
 
                     pwDsv = new PrintWriter(new OutputStreamWriter(
-                            new FileOutputStream(dsvFile),
+                    		dsvFile.getContent().getOutputStream(),
                             (shared.encoding == null)
                             ? DEFAULT_FILE_ENCODING : shared.encoding));
 
@@ -1546,11 +1550,15 @@ public class SqlFile {
                     }
                     pwDsv.flush();
                     stdprintln(SqltoolRB.file_wrotechars.getString(
-                            Long.toString(dsvFile.length()),
+                            Long.toString(dsvFile.getContent().getSize()),
                             dsvFile.toString()));
+                    /*
                 } catch (FileNotFoundException e) {
                     throw new BadSpecial(SqltoolRB.file_writefail.getString(
-                            other), e);
+                            other), e);*/
+                } catch (FileSystemException fse) {
+                        throw new BadSpecial(SqltoolRB.file_writefail.getString(
+                                other), fse);
                 } catch (UnsupportedEncodingException e) {
                     throw new BadSpecial(SqltoolRB.file_writefail.getString(
                             other), e);
@@ -1618,7 +1626,7 @@ public class SqlFile {
 
                 try {
                     pwQuery = new PrintWriter(new OutputStreamWriter(
-                            new FileOutputStream(dereferenceAt(other), true),
+                    		GAEFileManager.getFile(dereferenceAt(other)).getContent().getOutputStream(true),
                             (shared.encoding == null)
                             ? DEFAULT_FILE_ENCODING : shared.encoding));
 
@@ -1648,7 +1656,7 @@ public class SqlFile {
                 }
 
                 try {
-                    new SqlFile(this, new File(dereferenceAt(other))).execute();
+                    new SqlFile(this, GAEFileManager.getFile(dereferenceAt(other))).execute();
                 } catch (ContinueException ce) {
                     throw ce;
                 } catch (BreakException be) {
@@ -1763,8 +1771,7 @@ public class SqlFile {
                 }
                 if (urlid != null || acct != null) try {
                     if (urlid != null) {
-                        shared.jdbcConn = new RCData(new File(
-                            SqlTool.DEFAULT_RCFILE), urlid).getConnection();
+                        shared.jdbcConn = new RCData(GAEFileManager.getFile(SqlTool.DEFAULT_RCFILE), urlid).getConnection();
                     } else if (acct != null) {
                         shared.jdbcConn =
                                 DriverManager.getConnection(url, acct, pwd);
@@ -1834,9 +1841,8 @@ public class SqlFile {
                             SqltoolRB.special_b_malformat.getString());
                 }
 
-                File otherFile = new File(dereferenceAt(other));
-
                 try {
+                	FileObject otherFile = GAEFileManager.getFile(dereferenceAt(other));
                     if (arg1.charAt(1) == 'd') {
                         dump(otherFile);
                     } else {
@@ -2427,9 +2433,9 @@ public class SqlFile {
             if (varName.indexOf(':') > -1) {
                 throw new BadSpecial(SqltoolRB.plvar_nocolon.getString());
             }
-            File   dlFile    = new File(dereferenceAt(tokens[2]));
-
+            FileObject   dlFile = null;
             try {
+            	dlFile    = GAEFileManager.getFile(dereferenceAt(tokens[2]));
                 if (tokens[0].equals("dump")) {
                     dump(varName, dlFile);
                 } else {
@@ -4119,7 +4125,7 @@ public class SqlFile {
      * dumpFile must not be null.
      */
     private void dump(String varName,
-                      File dumpFile) throws IOException, BadSpecial {
+                      FileObject dumpFile) throws IOException, BadSpecial {
         String val = shared.userVars.get(varName);
 
         if (val == null) {
@@ -4127,7 +4133,7 @@ public class SqlFile {
         }
 
         OutputStreamWriter osw = new OutputStreamWriter(
-                new FileOutputStream(dumpFile), (shared.encoding == null)
+        		dumpFile.getContent().getOutputStream(), (shared.encoding == null)
                 ? DEFAULT_FILE_ENCODING : shared.encoding);
 
         try {
@@ -4155,7 +4161,7 @@ public class SqlFile {
         // Since opened in overwrite mode, since we didn't exception out,
         // we can be confident that we wrote all the bytest in the file.
         stdprintln(SqltoolRB.file_wrotechars.getString(
-                Long.toString(dumpFile.length()), dumpFile.toString()));
+                Long.toString(dumpFile.getContent().getSize()), dumpFile.toString()));
     }
 
     byte[] binBuffer;
@@ -4165,13 +4171,13 @@ public class SqlFile {
      *
      * dumpFile must not be null.
      */
-    private void dump(File dumpFile) throws IOException, BadSpecial {
+    private void dump(FileObject dumpFile) throws IOException, BadSpecial {
         if (binBuffer == null) {
             throw new BadSpecial(SqltoolRB.binbuffer_empty.getString());
         }
 
         int len = 0;
-        FileOutputStream fos = new FileOutputStream(dumpFile);
+        java.io.OutputStream fos = dumpFile.getContent().getOutputStream();
 
         try {
             fos.write(binBuffer);
@@ -4242,9 +4248,9 @@ public class SqlFile {
     /**
      * Ascii file load.
      */
-    private void load(String varName, File asciiFile, String cs)
+    private void load(String varName, FileObject asciiFile, String cs)
             throws IOException {
-        String string = streamToString(new FileInputStream(asciiFile), cs);
+        String string = streamToString(asciiFile.getContent().getInputStream(), cs);
         // The streamToString() method ensures that the Stream gets closed
         shared.userVars.put(varName, string);
         updateUserSettings();
@@ -4275,12 +4281,12 @@ public class SqlFile {
      *
      * @return The bytes which are the content of the fil
      */
-    public static byte[] loadBinary(File binFile) throws IOException {
+    public static byte[] loadBinary(FileObject binFile) throws IOException {
         byte[]                xferBuffer = new byte[10240];
         byte[]                outBytes = null;
         ByteArrayOutputStream baos;
         int                   i;
-        FileInputStream       fis        = new FileInputStream(binFile);
+        InputStream       fis        = binFile.getContent().getInputStream();
 
         try {
             baos = new ByteArrayOutputStream();
@@ -4600,7 +4606,14 @@ public class SqlFile {
          * assume no special characters or escaping in column names. */
         Matcher matcher;
         byte[] bfr  = null;
-        File   dsvFile = new File(filePath);
+        FileObject   dsvFile = null;
+        try {
+        	dsvFile = GAEFileManager.getFile(filePath);
+        } catch(FileSystemException fse) {
+        	throw new SqlToolError(SqltoolRB.file_readfail.getString(
+        			filePath.toString()),  fse);
+        }
+        
         SortedMap<String, String> constColMap = null;
         if (dsvConstCols != null) {
             // We trim col. names, but not values.  Must allow users to
@@ -4624,15 +4637,17 @@ public class SqlFile {
                 skipCols.add(skipCol.trim().toLowerCase());
             }
         }
-
-        if (!dsvFile.canRead()) {
-            throw new SqlToolError(SqltoolRB.file_readfail.getString(
-                    dsvFile.toString()));
-        }
-
+       
         try {
-            bfr = new byte[(int) dsvFile.length()];
-        } catch (RuntimeException re) {
+	        if (!dsvFile.isReadable()) {
+	            throw new SqlToolError(SqltoolRB.file_readfail.getString(
+	                    dsvFile.toString()));
+	        }        
+            bfr = new byte[(int) dsvFile.getContent().getSize()];
+        } catch(FileSystemException fse) {
+        	 throw new SqlToolError(SqltoolRB.read_toobig.getString(), fse);
+        }
+        catch (RuntimeException re) {
             throw new SqlToolError(SqltoolRB.read_toobig.getString(), re);
         }
 
@@ -4641,7 +4656,7 @@ public class SqlFile {
         InputStream is = null;
 
         try {
-            is = new FileInputStream(dsvFile);
+            is = dsvFile.getContent().getInputStream();
             while (bytesread < bfr.length &&
                     (retval = is.read(bfr, bytesread, bfr.length - bytesread))
                     > 0) {
@@ -4790,7 +4805,7 @@ public class SqlFile {
         // values may be nulls.
 
         if (tableName == null) {
-            tableName = dsvFile.getName();
+            tableName = dsvFile.getName().getBaseName();
 
             int i = tableName.lastIndexOf('.');
 
@@ -4899,15 +4914,15 @@ public class SqlFile {
 
         // Initialize REJECT file(s)
         int rejectCount = 0;
-        File rejectFile = null;
-        File rejectReportFile = null;
+        FileObject rejectFile = null;
+        FileObject rejectReportFile = null;
         PrintWriter rejectWriter = null;
         PrintWriter rejectReportWriter = null;
         try {
         if (dsvRejectFile != null) try {
-            rejectFile = new File(dereferenceAt(dsvRejectFile));
+            rejectFile = GAEFileManager.getFile(dereferenceAt(dsvRejectFile));
             rejectWriter = new PrintWriter(
-                    new OutputStreamWriter(new FileOutputStream(rejectFile),
+                    new OutputStreamWriter(rejectFile.getContent().getOutputStream(),
                     (shared.encoding == null)
                     ? DEFAULT_FILE_ENCODING : shared.encoding));
             rejectWriter.print(headerLine + dsvRowDelim);
@@ -4919,17 +4934,17 @@ public class SqlFile {
                     dsvRejectFile), ioe);
         }
         if (dsvRejectReport != null) try {
-            rejectReportFile = new File(dereferenceAt(dsvRejectReport));
+            rejectReportFile = GAEFileManager.getFile(dereferenceAt(dsvRejectReport));
             rejectReportWriter = new PrintWriter(new OutputStreamWriter(
-                    new FileOutputStream(rejectReportFile),
+            		rejectFile.getContent().getOutputStream(),
                     (shared.encoding == null)
                     ? DEFAULT_FILE_ENCODING : shared.encoding));
             rejectReportWriter.println(SqltoolRB.rejectreport_top.getString(
                     (new java.util.Date()).toString(),
-                    dsvFile.getPath(),
+                    dsvFile.getName().getPath(),
                     ((rejectFile == null) ? SqltoolRB.none.getString()
-                                    : rejectFile.getPath()),
-                    ((rejectFile == null) ? null : rejectFile.getPath())));
+                                    : rejectFile.getName().getPath()),
+                    ((rejectFile == null) ? null : rejectFile.getName().getPath())));
         } catch (BadSpecial bs) {
             throw new SqlToolError(
                     SqltoolRB.dsv_rejectreport_setupfail.getString(
@@ -5242,18 +5257,25 @@ public class SqlFile {
                         summaryString, revnum));
                 rejectReportWriter.flush();
             }
-            if (rejectCount == 0) {
-                if (rejectFile != null && rejectFile.exists()
-                        && !rejectFile.delete())
-                    errprintln(SqltoolRB.dsv_rejectfile_purgefail.getString(
-                            rejectFile.toString()));
-                if (rejectReportFile != null && !rejectReportFile.delete())
-                    errprintln(SqltoolRB.dsv_rejectreport_purgefail.getString(
-                            (rejectFile == null)
-                                    ? null : rejectFile.toString()));
+            try {
+	            if (rejectCount == 0) {
+	                if (rejectFile != null && rejectFile.exists()
+	                        && !rejectFile.delete())
+	                    errprintln(SqltoolRB.dsv_rejectfile_purgefail.getString(
+	                            rejectFile.toString()));
+	                if (rejectReportFile != null && !rejectReportFile.delete())
+	                    errprintln(SqltoolRB.dsv_rejectreport_purgefail.getString(
+	                            (rejectFile == null)
+	                                    ? null : rejectFile.toString()));
+	            }
+	         } catch(Exception ee)
+	         {
+	        	 
+	         }
+	            
                 // These are trivial errors.
             }
-        }
+       
         } finally {
             if (rejectWriter != null) {
                 try {
@@ -5539,6 +5561,6 @@ public class SqlFile {
             throw new BadSpecial(
                     "Leading @ in file paths has special meaning, and may "
                     + " only be used if input is a file.");
-        return baseDir.getPath() + s.substring(1);
+        return baseDir.getName().getPath() + s.substring(1);
     }
 }

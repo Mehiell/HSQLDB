@@ -30,20 +30,24 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
+
 import java.io.DataInputStream;
 import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 
 import org.hsqldb.DatabaseManager;
 import org.hsqldb.HsqlDateTime;
 import org.hsqldb.HsqlException;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.FileUtil;
 import org.hsqldb.lib.HsqlTimer;
 import org.hsqldb.lib.StringConverter;
@@ -504,7 +508,7 @@ public class LockFile {
      * and adherence to desirable <tt>LockFile</tt> factory method event
      * sequence more complicated.
      */
-    protected File file;
+    protected FileObject file;
 
     /**
      * Cached value of the lock file's canonical path
@@ -524,7 +528,7 @@ public class LockFile {
      * This <tt>RandomAccessFile</tt> is used to periodically write out the
      * heartbeat timestamp to this object's lock file.
      */
-    protected volatile RandomAccessFile raf;
+    protected volatile RandomAccessContent raf;
 
     /** Indicates presence or absence of the cooperative lock condition. */
     protected volatile boolean locked;
@@ -795,9 +799,9 @@ public class LockFile {
         try {
             if (withCreateNewFile) {
                 try {
-                    if (file.createNewFile()) {
-                        return;
-                    }
+                    file.createFile();
+                    return;
+                   
                 } catch (IOException ioe) {}
             }
 
@@ -805,7 +809,9 @@ public class LockFile {
                 return;
             }
 
-            length = file.length();
+            length = file.getContent().getSize();
+        } catch (FileSystemException fse) {
+            throw new UnexpectedFileIOException(this, "checkHeartbeat", fse);
         } catch (SecurityException se) {
             throw new FileSecurityException(this, "checkHeartbeat", se);
         }
@@ -826,11 +832,15 @@ public class LockFile {
 
 //#endif JAVA2
         if (length != USED_REGION) {
-            if (length == 0) {
-                file.delete();
-
-                return;
-            }
+        	try{
+	            if (length == 0) {
+	                file.delete();
+	
+	                return;
+	            }
+        	} catch (FileSystemException fse) {
+        		throw new WrongLengthException(this, "checkHeartbeat", 0);
+        	}
 
             throw new WrongLengthException(this, "checkHeartbeat", length);
         }
@@ -1036,11 +1046,13 @@ public class LockFile {
         // Should at least be absolutized for reporting purposes, just in case
         // a security or canonicalization exception gets thrown.
         path      = FileUtil.getFileUtil().canonicalOrAbsolutePath(path);
-        this.file = new File(path);
-
+        
         try {
+        	this.file = GAEFileManager.getFile(path);
             FileUtil.getFileUtil().makeParentDirectories(this.file);
-        } catch (SecurityException ex) {
+        } catch (FileSystemException fsx) {
+            throw new FileSecurityException(this, "setPath", null);
+        }  catch (SecurityException ex) {
             throw new FileSecurityException(this, "setPath", ex);
         }
 
@@ -1052,7 +1064,7 @@ public class LockFile {
             throw new FileCanonicalizationException(this, "setPath", ex);
         }
 
-        this.cpath = this.file.getPath();
+        this.cpath = this.file.getName().getPath();
     }
 
     /**
@@ -1073,11 +1085,11 @@ public class LockFile {
            LockFile.FileSecurityException, LockFile.UnexpectedFileIOException {
 
         try {
-            raf = new RandomAccessFile(file, "rw");
+            raf = file.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
         } catch (SecurityException ex) {
             throw new FileSecurityException(this, "openRAF", ex);
-        } catch (FileNotFoundException ex) {
-            throw new UnexpectedFileNotFoundException(this, "openRAF", ex);
+        } catch (FileSystemException fsx) {
+            throw new UnexpectedFileIOException(this, "openRAF", fsx);
         } catch (IOException ex) {
             throw new UnexpectedFileIOException(this, "openRAF", ex);
         }
@@ -1160,7 +1172,7 @@ public class LockFile {
            LockFile.UnexpectedEndOfFileException,
            LockFile.UnexpectedFileIOException, LockFile.WrongMagicException {
 
-        FileInputStream fis = null;
+        InputStream fis = null;
         DataInputStream dis = null;
 
         try {
@@ -1168,7 +1180,7 @@ public class LockFile {
                 return Long.MIN_VALUE;
             }
 
-            fis = new FileInputStream(file);
+            fis = file.getContent().getInputStream();
             dis = new DataInputStream(fis);
 
             checkMagic(dis);
@@ -1437,7 +1449,11 @@ public class LockFile {
      *         <tt>checkRead</tt> method denies read access to the lock file;
      */
     public boolean isValid() {
-        return isLocked() && file != null && file.exists() && raf != null;
+    	try {
+    		return isLocked() && file != null && file.exists() && raf != null;
+    	} catch(FileSystemException fsx) {
+    		return false;
+    	}
     }
 
     /**
@@ -1465,11 +1481,19 @@ public class LockFile {
      */
     public String toString() {
 
-        return new StringBuffer(super.toString()).append("[file =").append(
-            cpath).append(", exists=").append(file.exists()).append(
-            ", locked=").append(isLocked()).append(", valid=").append(
-            isValid()).append(", ").append(toStringImpl()).append(
-            "]").toString();
+    	try {
+	        return new StringBuffer(super.toString()).append("[file =").append(
+	            cpath).append(", exists=").append(file.exists()).append(
+	            ", locked=").append(isLocked()).append(", valid=").append(
+	            isValid()).append(", ").append(toStringImpl()).append(
+	            "]").toString();
+    	} catch(FileSystemException fsx) {
+    		return new StringBuffer(super.toString()).append("[file =").append(
+    	            cpath).append(", exists=").append(false).append(
+    	            ", locked=").append(isLocked()).append(", valid=").append(
+    	            isValid()).append(", ").append(toStringImpl()).append(
+    	            "]").toString();
+    	}
     }
 
     /**
@@ -1877,6 +1901,9 @@ public class LockFile {
                 // Another Lockfile may recreate the file an instant after it is
                 // deleted above (if it it deleted successfully, that is)
                 // released = !file.exists();
+            } catch (FileSystemException fsx) {
+                securityReason = new FileSecurityException(this, "tryRelease",
+                        null);
             } catch (SecurityException ex) {
                 securityReason = new FileSecurityException(this, "tryRelease",
                         ex);

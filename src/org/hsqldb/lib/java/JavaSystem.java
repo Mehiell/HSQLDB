@@ -30,20 +30,18 @@
 
 
 package org.hsqldb.lib.java;
-/*Peter comment*/
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.DriverManager;
 import java.util.Properties;
-import java.text.Collator;
-import java.io.RandomAccessFile;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 
 /**
  * Handles the differences between JDK 1.1.x and 1.2.x and above
@@ -199,11 +197,13 @@ public class JavaSystem {
 //#endif
     }
 
-    public static void deleteOnExit(File f) {
+    public static void deleteOnExit(FileObject f) {
 
 //#ifdef JAVA2FULL
-        f.deleteOnExit();
-
+    	try {
+    		f.delete();
+    	} catch(Exception ee)
+    	{}
 //#endif
     }
 
@@ -229,11 +229,12 @@ public class JavaSystem {
 //#endif
     }
 
-    public static boolean createNewFile(File file) {
+    public static boolean createNewFile(FileObject file) {
 
 //#ifdef JAVA2FULL
         try {
-            return file.createNewFile();
+            file.createFile();
+            return true;
         } catch (IOException e) {}
 
         return false;
@@ -246,12 +247,12 @@ public class JavaSystem {
 //#endif
     }
 
-    public static void setRAFileLength(RandomAccessFile raFile,
+    public static void setRAFileLength(FileObject raFile,
                                        long length) throws IOException {
 
 //#ifdef JAVA2FULL
-        raFile.setLength(length);
-
+    	RandomAccessContent rac = raFile.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
+    	rac.setLength(length);    	
 //#endif
     }
 }

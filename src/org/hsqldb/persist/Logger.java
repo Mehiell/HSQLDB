@@ -30,16 +30,17 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
-import java.io.File;
+
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
 import org.hsqldb.Database;
 import org.hsqldb.DatabaseURL;
-import org.hsqldb.HsqlNameManager;
+import org.hsqldb.HsqlException;
 import org.hsqldb.HsqlNameManager.HsqlName;
 import org.hsqldb.NumberSequence;
 import org.hsqldb.Row;
@@ -54,6 +55,7 @@ import org.hsqldb.TransactionManagerMV2PL;
 import org.hsqldb.TransactionManagerMVCC;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.index.Index;
 import org.hsqldb.index.IndexAVL;
 import org.hsqldb.index.IndexAVLMemory;
@@ -1762,9 +1764,7 @@ public class Logger {
             runtimeFileDelim =
                 new Character(System.getProperty("file.separator").charAt(0));
         }
-
-        String instanceName = new File(dbPath).getName();
-
+        
         if (destPath == null || destPath.length() < 1) {
             throw Error.error(ErrorCode.X_2200F, "0-length destination path");
         }
@@ -1774,23 +1774,36 @@ public class Logger {
                                 || lastChar == runtimeFileDelim.charValue());
         String defaultCompressionSuffix = compressed ? ".tar.gz"
                                                      : ".tar";
-        File archiveFile =
-            generateName
-            ? (new File(destPath.substring(0, destPath.length() - 1),
-                        instanceName + '-'
-                        + backupFileFormat.format(new java.util.Date())
-                        + defaultCompressionSuffix))
-            : (new File(destPath));
-        boolean nameImpliesCompress =
-            archiveFile.getName().endsWith(".tar.gz")
-            || archiveFile.getName().endsWith(".tgz");
-
-        if ((!nameImpliesCompress)
-                && !archiveFile.getName().endsWith(".tar")) {
-            throw Error.error(null, ErrorCode.UNSUPPORTED_FILENAME_SUFFIX, 0,
-                              new String[] {
-                archiveFile.getName(), ".tar, .tar.gz, .tgz"
-            });
+        
+        boolean nameImpliesCompress = false;
+        FileObject archiveFile = null;
+        String instanceName  = null;
+        try {
+	        instanceName = GAEFileManager.getFile(dbPath).getName().getBaseName();
+	        archiveFile =
+	            generateName
+	            ? (GAEFileManager.getFile(destPath.substring(0, destPath.length() - 1) + "/" + 
+	                        instanceName + '-' 
+	                        + backupFileFormat.format(new java.util.Date())
+	                        + defaultCompressionSuffix))
+	            : (GAEFileManager.getFile(destPath));
+	            
+	        nameImpliesCompress =
+	            archiveFile.getName().getBaseName().endsWith(".tar.gz")
+	            || archiveFile.getName().getBaseName().endsWith(".tgz");
+	
+	        if ((!nameImpliesCompress)
+	                && !archiveFile.getName().getBaseName().endsWith(".tar")) {
+	            throw Error.error(null, ErrorCode.UNSUPPORTED_FILENAME_SUFFIX, 0,
+	                              new String[] {
+	                archiveFile.getName().getBaseName(), ".tar, .tar.gz, .tgz"
+	            });
+	        }
+        } catch (FileSystemException fsx) {
+        	 throw Error.error(null, ErrorCode.COMPRESSION_SUFFIX_MISMATCH, 0,
+                     new Object[] {
+			       new Boolean(compressed), archiveFile.getName()
+			   });
         }
 
         if (compressed != nameImpliesCompress) {

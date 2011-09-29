@@ -31,7 +31,7 @@
 
 package org.hsqldb.util.preprocessor;
 /*Peter comment*/
-import java.io.File;
+import org.apache.commons.vfs.FileObject;
 
 /* $Id: IResolver.java 610 2008-12-22 15:54:18Z unsaved $ */
 
@@ -50,5 +50,5 @@ import java.io.File;
  */
 public interface IResolver {
     public String resolveProperties(String expression);
-    public File   resolveFile(String path);
+    public FileObject   resolveFile(String path);
 }

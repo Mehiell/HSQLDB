@@ -30,12 +30,13 @@
 
 
 package org.hsqldb.persist;
-/*Peter comment*/
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 
+import java.io.IOException;
+
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 import org.hsqldb.Database;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * This class is a simple wapper for a random access file such as used
@@ -47,14 +48,17 @@ import org.hsqldb.Database;
  */
 final class ScaledRAFileSimple implements RandomAccessInterface {
 
-    final RandomAccessFile file;
+    final RandomAccessContent file;
     final boolean          readOnly;
+    private String openMode;
 
     ScaledRAFileSimple(String name,
                        String openMode)
-                       throws FileNotFoundException, IOException {
-        this.file = new RandomAccessFile(name, openMode);
-        readOnly  = openMode.equals("r");
+                       throws IOException {
+    	readOnly  = openMode.equals("r");
+    	this.openMode = openMode;
+        this.file = GAEFileManager.getFile(name).getContent().getRandomAccessContent(readOnly?RandomAccessMode.READ:RandomAccessMode.READWRITE);
+               
     }
 
     public long length() throws IOException {
@@ -70,7 +74,7 @@ final class ScaledRAFileSimple implements RandomAccessInterface {
     }
 
     public int read() throws IOException {
-        return file.read();
+        return file.readInt();
     }
 
     public long readLong() throws IOException {
@@ -129,9 +133,10 @@ final class ScaledRAFileSimple implements RandomAccessInterface {
     }
 
     public void synch() {
-
+    	/*
         try {
             file.getFD().sync();
-        } catch (IOException e) {}
+        } catch (IOException e) {}*/
     }
+    
 }
