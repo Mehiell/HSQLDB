@@ -30,17 +30,18 @@
 
 
 package org.hsqldb.lib;
-/*Peter comment*/
+
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.StringTokenizer;
+
+import org.apache.commons.vfs.FileObject;
 
 /* $Id: RCData.java 4141 2011-03-14 01:35:49Z fredt $ */
 
@@ -92,13 +93,13 @@ public class RCData {
      *              (A rather ill-conceived design).
      * @param file File containing the authentication information.
      */
-    public RCData(File file, String dbKey) throws Exception {
+    public RCData(FileObject file, String dbKey) throws Exception {
 
         if (file == null) {
             throw new IllegalArgumentException("RC file name not specified");
         }
 
-        if (!file.canRead()) {
+        if (!file.isReadable()) {
             throw new IOException("Please set up authentication file '" + file
                                   + "'");
         }
@@ -109,7 +110,7 @@ public class RCData {
         String          s;
         String          keyword, value;
         int             linenum = 0;
-        BufferedReader  br      = new BufferedReader(new FileReader(file));
+        BufferedReader  br      = new BufferedReader(new InputStreamReader(file.getContent().getInputStream()));
 
         try {
         while ((s = br.readLine()) != null) {

@@ -30,12 +30,13 @@
 
 
 package org.hsqldb.lib;
-/*Peter comment*/
-import java.io.File;
-import java.io.FileWriter;
+
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 
+import org.apache.commons.vfs.FileObject;
 import org.hsqldb.HsqlDateTime;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * Simple log for recording abnormal events in persistence<p>
@@ -86,19 +87,22 @@ public class SimpleLog {
             if (isSystem) {
                 writer = new PrintWriter(System.out);
             } else {
-                File file = new File(filePath);
-
+            	FileObject file = null;
+            	try {
+            		file = GAEFileManager.getFile(filePath);
+            	} catch(Exception e) {}
+            	
                 setupLog(file);
             }
         }
     }
 
-    private void setupLog(File file) {
+    private void setupLog(FileObject file) {
 
         try {
             FileUtil.getFileUtil().makeParentDirectories(file);
 
-            writer = new PrintWriter(new FileWriter(file.getPath(), true),
+            writer = new PrintWriter(new OutputStreamWriter(file.getContent().getOutputStream()), 
                                      true);
         } catch (Exception e) {
             isSystem = true;

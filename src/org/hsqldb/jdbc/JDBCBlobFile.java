@@ -30,25 +30,29 @@
 
 
 package org.hsqldb.jdbc;
-/*Peter comment*/
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.Blob;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.CountdownInputStream;
 import org.hsqldb.lib.FileUtil;
 import org.hsqldb.lib.InOutUtil;
@@ -76,7 +80,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         checkClosed();
 
         try {
-            return m_file.length();
+            return m_file.getContent().getSize();
         } catch (Exception e) {
             throw Util.sqlException(e);
         }
@@ -365,7 +369,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         OutputStream result;
 
         try {
-            final OutputStream stream = new OutputStreamAdapter(m_file, pos - 1) {
+			final OutputStream stream = new OutputStreamAdapter(m_file, pos - 1) {
 
                 public void close() throws IOException {
                     try {
@@ -412,17 +416,17 @@ public class JDBCBlobFile implements java.sql.Blob {
 
         checkClosed();
 
-        RandomAccessFile randomAccessFile = null;
+        RandomAccessContent rac = null;
 
         try {
-            randomAccessFile = new RandomAccessFile(m_file, "rw");
-            randomAccessFile.setLength(len);
+        	rac = m_file.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
+        	rac.setLength(len);
         } catch (Exception ex) {
             throw Util.sqlException(ex);
         } finally {
-            if (randomAccessFile != null) {
+            if (rac != null) {
                 try {
-                    randomAccessFile.close();
+                	rac.close();
                 } catch (Exception ex) {
                 }
             }
@@ -565,7 +569,7 @@ public class JDBCBlobFile implements java.sql.Blob {
     //
     private static final int COPY_BUFFER_CAPACITY = 8192;
     //
-    private final File m_file;
+    private final FileObject m_file;
     private boolean m_closed;
     private boolean m_temp;
     private List m_streams = new ArrayList();
@@ -583,7 +587,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         m_temp = true;
 
         try {
-            m_file = File.createTempFile(TEMP_FILE_PREFIX, TEMP_FILE_SUFFIX);
+            m_file = GAEFileManager.getFile(TEMP_FILE_PREFIX + java.util.UUID.randomUUID().toString() + TEMP_FILE_SUFFIX);
 
             FileUtil.getFileUtil().deleteOnExit(m_file);
         } catch (Exception ex) {
@@ -600,9 +604,9 @@ public class JDBCBlobFile implements java.sql.Blob {
      * @param file
      * @throws SQLException
      */
-    public JDBCBlobFile(final File file) throws SQLException {
+    public JDBCBlobFile(final FileObject file) throws SQLException {
         try {
-            m_file = file.getCanonicalFile();
+            m_file = file;
         } catch (Exception ex) {
             throw Util.sqlException(ex);
         }
@@ -613,7 +617,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         boolean exists;
 
         try {
-            isFile = m_file.isFile();
+            isFile = m_file.getType().equals(FileType.FILE);
             exists = isFile || m_file.exists();
         } catch (Exception ex) {
             throw Util.sqlException(ex);
@@ -638,7 +642,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         try {
             if (!m_file.exists()) {
                 FileUtil.getFileUtil().makeParentDirectories(m_file);
-                m_file.createNewFile();
+                m_file.createFile();
             }
         } catch (Exception ex) {
             throw Util.sqlException(ex);
@@ -649,14 +653,14 @@ public class JDBCBlobFile implements java.sql.Blob {
 
     protected static class OutputStreamAdapter extends OutputStream {
 
-        private final RandomAccessFile m_randomAccessFile;
+        private final RandomAccessContent m_randomAccessFile;
 
-        public OutputStreamAdapter(final File file, final long pos) throws FileNotFoundException, IOException {
+        public OutputStreamAdapter(final FileObject file, final long pos) throws FileNotFoundException, IOException {
             if (pos < 0) {
                 throw new IllegalArgumentException("pos: " + pos);
             }
 
-            m_randomAccessFile = new RandomAccessFile(file, "rw");
+            m_randomAccessFile = file.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
             m_randomAccessFile.seek(pos);
         }
 
@@ -673,7 +677,7 @@ public class JDBCBlobFile implements java.sql.Blob {
         }
 
         public void flush() throws IOException {
-            m_randomAccessFile.getFD().sync();
+            //m_randomAccessFile.;
         }
 
         public void close() throws IOException {
@@ -683,10 +687,10 @@ public class JDBCBlobFile implements java.sql.Blob {
 
     static class InputStreamAdapter extends InputStream {
 
-        private final FileInputStream m_fileInputStream;
+        private final InputStream m_fileInputStream;
         private final CountdownInputStream m_countdownInputStream;
 
-        InputStreamAdapter(final File file, final long pos,
+        InputStreamAdapter(final FileObject file, final long pos,
                 final long length) throws FileNotFoundException, IOException {
             if (file == null) {
                 throw new NullPointerException("file");
@@ -698,7 +702,7 @@ public class JDBCBlobFile implements java.sql.Blob {
                 throw new IllegalArgumentException("length: " + length);
             }
 
-            final FileInputStream fis = new FileInputStream(file);
+            final InputStream fis = file.getContent().getInputStream();
 
             if (pos > 0) {
                 final long actualPos = fis.skip(pos);

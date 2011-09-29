@@ -30,10 +30,12 @@
 
 
 package org.hsqldb.cmdline;
-/*Peter comment*/
-import java.io.File;
+
 import java.util.ArrayList;
 import java.util.Date;
+
+import org.apache.commons.vfs.FileObject;
+import org.hsqldb.gae.GAEFileManager;
 
 /* $Id: SqlToolSprayer.java 4141 2011-03-14 01:35:49Z fredt $ */
 
@@ -87,11 +89,17 @@ public class SqlToolSprayer {
                         : Integer.parseInt(
                             System.getProperty("sqltoolsprayer.maxtime")));
         String rcFile   = System.getProperty("sqltoolsprayer.rcfile");
-        File monitorFile =
-            (System.getProperty("sqltoolsprayer.monfile") == null) ? null
-                                                                   : new File(
-                                                                       System.getProperty(
-                                                                           "sqltoolsprayer.monfile"));
+        FileObject monitorFile = null;
+        try {
+        	monitorFile = (System.getProperty("sqltoolsprayer.monfile") == null) ? null
+                    : GAEFileManager.getFile(
+                        System.getProperty(
+                            "sqltoolsprayer.monfile"));
+        } catch(Exception ee)
+        {
+        	
+        }
+            
         ArrayList<String> urlids = new ArrayList<String>();
 
         for (int i = 1; i < sa.length; i++) {
@@ -115,49 +123,53 @@ public class SqlToolSprayer {
                                                   : withRcArgs;
         boolean  onefailed     = false;
         long     startTime     = (new Date()).getTime();
-
-        while (true) {
-            if (monitorFile != null && !monitorFile.exists()) {
-                System.err.println("Required file is gone:  " + monitorFile);
-                System.exit(2);
-            }
-
-            onefailed = false;
-
-            for (int i = 0; i < status.length; i++) {
-                if (status[i]) {
-                    continue;
-                }
-
-                sqlToolArgs[sqlToolArgs.length - 1] = urlids.get(i);
-                // System.err.println("ARGS:"
-                //      + java.util.Arrays.asList(sqlToolArgs));
-
-                try {
-                    SqlTool.objectMain(sqlToolArgs);
-
-                    status[i] = true;
-
-                    System.err.println("Success for instance '"
-                                       + urlids.get(i) + "'");
-                } catch (SqlTool.SqlToolException se) {
-                    onefailed = true;
-                }
-            }
-
-            if (!onefailed) {
-                break;
-            }
-
-            if (maxtime == 0 || (new Date()).getTime() > startTime + maxtime) {
-                break;
-            }
-
-            try {
-                Thread.sleep(period);
-            } catch (InterruptedException ie) {
-                // Purposefully doing nothing
-            }
+        try {
+	        while (true) {
+	            if (monitorFile != null && !monitorFile.exists()) {
+	                System.err.println("Required file is gone:  " + monitorFile);
+	                System.exit(2);
+	            }
+	
+	            onefailed = false;
+	
+	            for (int i = 0; i < status.length; i++) {
+	                if (status[i]) {
+	                    continue;
+	                }
+	
+	                sqlToolArgs[sqlToolArgs.length - 1] = urlids.get(i);
+	                // System.err.println("ARGS:"
+	                //      + java.util.Arrays.asList(sqlToolArgs));
+	
+	                try {
+	                    SqlTool.objectMain(sqlToolArgs);
+	
+	                    status[i] = true;
+	
+	                    System.err.println("Success for instance '"
+	                                       + urlids.get(i) + "'");
+	                } catch (SqlTool.SqlToolException se) {
+	                    onefailed = true;
+	                }
+	            }
+	
+	            if (!onefailed) {
+	                break;
+	            }
+	
+	            if (maxtime == 0 || (new Date()).getTime() > startTime + maxtime) {
+	                break;
+	            }
+	
+	            try {
+	                Thread.sleep(period);
+	            } catch (InterruptedException ie) {
+	                // Purposefully doing nothing
+	            }
+	        }
+        } catch(Exception ee)
+        {
+        	
         }
 
         ArrayList<String> failedUrlids = new ArrayList<String>();

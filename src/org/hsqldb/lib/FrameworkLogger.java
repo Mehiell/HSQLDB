@@ -30,21 +30,24 @@
 
 
 package org.hsqldb.lib;
-/*Peter comment*/
-import java.util.Enumeration;
-import java.util.logging.Level;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Logger;
-import java.util.logging.LogManager;
-import java.util.Map;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.Properties;
+
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
+import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * A logging framework wrapper that supports java.util.logging and log4j.
@@ -500,15 +503,19 @@ public class FrameworkLogger {
      * we return false.
      */
     public static boolean isDefaultJdkConfig() {
-        File globalCfgFile = new File(System.getProperty("java.home"),
-                "lib/logging.properties");
-        if (!globalCfgFile.isFile()) {
-            return false;
+    	FileObject globalCfgFile = null;
+    	try {
+	        globalCfgFile = GAEFileManager.getFile("lib/logging.properties");
+	        if (!globalCfgFile.getType().equals(FileType.FILE)) {
+	            return false;
         }
-        FileInputStream fis = null;
+    	} catch (Exception e) {
+    		return false;
+    	}
+        InputStream fis = null;
         LogManager lm = LogManager.getLogManager();
         try {
-            fis = new FileInputStream(globalCfgFile);
+            fis = globalCfgFile.getContent().getInputStream();
             Properties defaultProps = new Properties();
             defaultProps.load(fis);
             Enumeration names = defaultProps.propertyNames();

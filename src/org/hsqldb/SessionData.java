@@ -30,17 +30,18 @@
 
 
 package org.hsqldb;
-/*Peter comment*/
-import java.io.File;
-import java.io.FileInputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileSystemException;
 import org.hsqldb.HsqlNameManager.HsqlName;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.CharArrayWriter;
 import org.hsqldb.lib.CountdownInputStream;
 import org.hsqldb.lib.HashMap;
@@ -581,65 +582,70 @@ public class SessionData {
     }
 
     ClobData createClobFromFile(String filename, String encoding) {
-
-        File    file   = new File(filename);
-        boolean exists = file.exists();
-
-        if (!exists) {
-            throw Error.error(ErrorCode.FILE_IO_ERROR);
-        }
-
-        long        fileLength = file.length();
-        InputStream is         = null;
-
+    	
+    	InputStream is         = null;
         try {
+        	FileObject file = GAEFileManager.getFile(filename);
+            boolean exists = file.exists();
+
+            if (!exists) {
+                throw Error.error(ErrorCode.FILE_IO_ERROR);
+            }
+
+            long        fileLength = file.getContent().getSize();            
             ClobData clob = session.createClob(fileLength);
 
-            is = new FileInputStream(file);
-
+            is = file.getContent().getInputStream();
+            
             Reader reader = new InputStreamReader(is, encoding);
 
             is = new ReaderInputStream(reader);
 
             database.lobManager.setCharsForNewClob(clob.getId(), is,
-                                                   fileLength, true);
+                    fileLength, true);
 
             return clob;
+        } catch (FileSystemException fse) {
+            throw Error.error(ErrorCode.FILE_IO_ERROR);
         } catch (IOException e) {
-            throw Error.error(ErrorCode.FILE_IO_ERROR, e.toString());
-        } finally {
+            throw Error.error(ErrorCode.FILE_IO_ERROR);
+        }  
+        finally {
             try {
-                is.close();
+            	if(is != null)
+            		is.close();
             } catch (Exception e) {}
         }
     }
 
     BlobData createBlobFromFile(String filename) {
-
-        File    file   = new File(filename);
-        boolean exists = file.exists();
-
-        if (!exists) {
-            throw Error.error(ErrorCode.FILE_IO_ERROR);
-        }
-
-        long        fileLength = file.length();
-        InputStream is         = null;
-
+    	InputStream is         = null;
         try {
+        	FileObject file = GAEFileManager.getFile(filename);
+            boolean exists = file.exists();
+
+            if (!exists) {
+                throw Error.error(ErrorCode.FILE_IO_ERROR);
+            }
+
+            long        fileLength = file.getContent().getSize();            
             BlobData blob = session.createBlob(fileLength);
 
-            is = new FileInputStream(file);
+            is = file.getContent().getInputStream();
 
             database.lobManager.setBytesForNewBlob(blob.getId(), is,
                                                    fileLength);
 
             return blob;
+        } catch (FileSystemException fse) {
+            throw Error.error(ErrorCode.FILE_IO_ERROR);
         } catch (IOException e) {
             throw Error.error(ErrorCode.FILE_IO_ERROR);
-        } finally {
+        }  
+        finally {
             try {
-                is.close();
+            	if(is != null)
+            		is.close();
             } catch (Exception e) {}
         }
     }

@@ -30,40 +30,41 @@
 
 
 package org.hsqldb.jdbc;
-/*Peter comment*/
+
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.CharArrayWriter;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.RandomAccessFile;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
-
 import java.sql.Clob;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
+import org.apache.commons.vfs.RandomAccessContent;
+import org.apache.commons.vfs.util.RandomAccessMode;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.FileUtil;
 import org.hsqldb.lib.InOutUtil;
 import org.hsqldb.lib.KMPSearchAlgorithm;
@@ -103,7 +104,11 @@ public class JDBCClobFile implements java.sql.Clob {
         checkClosed();
 
         if (m_fixedWidthCharset) {
-            return m_file.length() * m_maxCharWidth;
+        	try {
+        		return m_file.getContent().getSize() * m_maxCharWidth;
+        	} catch (Exception e) {
+        		throw Util.sqlException(e);
+        	}
         }
 
         ReaderAdapter adapter = null;
@@ -591,7 +596,7 @@ public class JDBCClobFile implements java.sql.Clob {
         checkClosed();
 
         ReaderAdapter adapter = null;
-        RandomAccessFile randomAccessFile = null;
+        RandomAccessContent randomAccessFile = null;
         long filePointer;
 
         try {
@@ -601,7 +606,7 @@ public class JDBCClobFile implements java.sql.Clob {
 
             adapter.close();
 
-            randomAccessFile = new RandomAccessFile(m_file, "rw");
+            randomAccessFile =  m_file.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
 
             randomAccessFile.setLength(filePointer);
         } catch (Exception ex) {
@@ -756,7 +761,7 @@ public class JDBCClobFile implements java.sql.Clob {
      *
      * @return the file that backs this CLOB.
      */
-    public File getFile() {
+    public FileObject getFile() {
         return m_file;
     }
 
@@ -787,7 +792,7 @@ public class JDBCClobFile implements java.sql.Clob {
     public static final String TEMP_FILE_PREFIX = "hsql_jdbc_clob_file_";
     public static final String TEMP_FILE_SUFFIX = ".tmp";
     //
-    private final File m_file;
+    private final FileObject m_file;
     //
     private boolean m_closed;
     private boolean m_temp;
@@ -830,7 +835,7 @@ public class JDBCClobFile implements java.sql.Clob {
      *         cannot be created, is inaccessible or some other error occurs
      *         that prevents the construction of a valid instance of this class.
      */
-    public JDBCClobFile(final File file,
+    public JDBCClobFile(final FileObject file,
             final String encoding, boolean temp) throws SQLException {
         if (!temp && file == null) {
             throw Util.nullArgument("file");
@@ -838,8 +843,8 @@ public class JDBCClobFile implements java.sql.Clob {
         try {
             setEncoding(encoding);
             m_file = (temp)
-                    ? File.createTempFile(TEMP_FILE_PREFIX, TEMP_FILE_SUFFIX)
-                    : file.getCanonicalFile();
+                    ? GAEFileManager.getFile(TEMP_FILE_PREFIX + java.util.UUID.randomUUID() + TEMP_FILE_SUFFIX)
+                    : file;
             checkIsFile(/*checkExists*/false);
             if (temp) {
                 FileUtil.getFileUtil().deleteOnExit(m_file);
@@ -906,7 +911,7 @@ public class JDBCClobFile implements java.sql.Clob {
         boolean isFile;
 
         try {
-            isFile = m_file.isFile();
+            isFile = m_file.getType().equals(FileType.FILE);
         } catch (Exception ex) {
             throw Util.sqlException(ex);
         }
@@ -940,7 +945,7 @@ public class JDBCClobFile implements java.sql.Clob {
         try {
             if (!m_file.exists()) {
                 FileUtil.getFileUtil().makeParentDirectories(m_file);
-                m_file.createNewFile();
+                m_file.createFile();
             }
         } catch (Exception ex) {
             throw Util.sqlException(ex);
@@ -951,9 +956,9 @@ public class JDBCClobFile implements java.sql.Clob {
 
     protected class WriterAdapter extends Writer {
 
-        private final RandomAccessFile m_randomAccessFile;
+        private final RandomAccessContent m_randomAccessFile;
 
-        public WriterAdapter(final File file,
+        public WriterAdapter(final FileObject file,
                 final long pos) throws FileNotFoundException, IOException {
             if (file == null) {
                 throw new NullPointerException("file");
@@ -978,14 +983,14 @@ public class JDBCClobFile implements java.sql.Clob {
                 }
             }
 
-            m_randomAccessFile = new RandomAccessFile(file, "rw");
+            m_randomAccessFile = file.getContent().getRandomAccessContent(RandomAccessMode.READWRITE);
 
             m_randomAccessFile.seek(filePointer);
 
         }
 
         public void flush() throws IOException {
-            m_randomAccessFile.getFD().sync();
+            //m_randomAccessFile.getFD().sync();
         }
 
         public void close() throws IOException {
@@ -1015,7 +1020,7 @@ public class JDBCClobFile implements java.sql.Clob {
         private ByteBuffer m_byteBuffer;
         private CharBuffer m_charBuffer;
 
-        public ReaderAdapter(final File file, final long pos,
+        public ReaderAdapter(final FileObject file, final long pos,
                 final long length) throws FileNotFoundException, IOException {
             if (file == null) {
                 throw new NullPointerException("file");
@@ -1036,7 +1041,7 @@ public class JDBCClobFile implements java.sql.Clob {
                 m_byteBuffer = ByteBuffer.allocate(byteCapacity);
             }
 
-            final FileInputStream fis = new FileInputStream(file);
+            final InputStream fis = file.getContent().getInputStream();
             final BufferedInputStream bis = new BufferedInputStream(fis);
             final InputStreamReader isr = new InputStreamReader(bis, m_charset);
 
