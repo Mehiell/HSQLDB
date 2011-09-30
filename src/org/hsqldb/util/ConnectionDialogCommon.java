@@ -178,7 +178,7 @@ class ConnectionDialogCommon {
                 recentSettings = new File(homedir, fileName);
 
                 if (!recentSettings.exists()) {
-                    JavaSystem.createNewFile(recentSettings);
+                    //JavaSystem.createNewFile(recentSettings);
 
                     return list;
                 }

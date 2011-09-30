@@ -31,15 +31,17 @@
 
 package org.hsqldb.lib.tar;
 
-import org.hsqldb.lib.StringUtil;
-/*Peter comment*/
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.regex.Pattern;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
+import org.hsqldb.gae.GAEFileManager;
+import org.hsqldb.lib.StringUtil;
 
 /**
  * Reads a Tar file for reporting or extraction.
@@ -87,8 +89,8 @@ public class TarReader {
             System.exit(0);
         }
 
-        File exDir = (sa.length > 1 && sa[1].startsWith("--directory="))
-                     ? (new File(sa[1].substring("--directory=".length())))
+        FileObject exDir = (sa.length > 1 && sa[1].startsWith("--directory="))
+                     ? (GAEFileManager.getFile(sa[1].substring("--directory=".length())))
                      : null;
         int firstPatInd = (exDir == null) ? 2
                                           : 3;
@@ -118,14 +120,14 @@ public class TarReader {
         int tarReaderMode = sa[0].equals("t") ? LIST_MODE
                                               : EXTRACT_MODE;
 
-        new TarReader(new File(sa[dirIndex]), tarReaderMode, patternStrings,
+        new TarReader(GAEFileManager.getFile(sa[dirIndex]), tarReaderMode, patternStrings,
                       null, exDir).read();
     }
 
     protected TarFileInputStream archive;
     protected Pattern[]          patterns = null;
     protected int                mode;
-    protected File               extractBaseDir;    // null means current directory
+    protected FileObject              extractBaseDir;    // null means current directory
 
     // Not used for Absolute path entries
     // This path is always absolutized
@@ -153,21 +155,20 @@ public class TarReader {
      *                  you call with null 'patterns' param.
      * @see Pattern
      */
-    public TarReader(File inFile, int mode, String[] patternStrings,
-                     Integer readBufferBlocks, File inDir) throws IOException {
+    public TarReader(FileObject inFile, int mode, String[] patternStrings,
+                     Integer readBufferBlocks, FileObject inDir) throws IOException {
 
         this.mode = mode;
 
-        File archiveFile = inFile.getAbsoluteFile();
+        FileObject archiveFile = inFile;
 
-        extractBaseDir = (inDir == null) ? null
-                                         : inDir.getAbsoluteFile();
+        extractBaseDir = (inDir == null) ? null : inDir;
 
         int compression =
             TarFileOutputStream.Compression.NO_COMPRESSION;
 
-        if (archiveFile.getName().endsWith(".tgz")
-                || archiveFile.getName().endsWith(".gz")) {
+        if (archiveFile.getName().getBaseName().endsWith(".tgz")
+                || archiveFile.getName().getBaseName().endsWith(".gz")) {
             compression = TarFileOutputStream.Compression.GZIP_COMPRESSION;
         }
 
@@ -381,27 +382,28 @@ public class TarReader {
         int  readNow;
         int  readBlocks = (int) (header.getDataSize() / 512L);
         int  modulus    = (int) (header.getDataSize() % 512L);
-        File newFile    = header.generateFile();
+        FileObject newFile    = header.generateFile();
 
+        /*
         if (!newFile.isAbsolute()) {
             newFile = (extractBaseDir == null) ? newFile.getAbsoluteFile()
                                                : new File(extractBaseDir,
                                                newFile.getPath());
         }
-
+         */
         // newFile is definitively Absolutized at this point
-        File parentDir = newFile.getParentFile();
+        FileObject parentDir = newFile.getParent();
 
         if (newFile.exists()) {
             if (mode != TarReader.OVERWRITE_MODE) {
                 throw new IOException(
-                    RB.extraction_exists.getString(newFile.getAbsolutePath()));
+                    RB.extraction_exists.getString(newFile.getName().getPath()));
             }
 
-            if (!newFile.isFile()) {
+            if (!newFile.getType().equals(FileType.FILE)) {
                 throw new IOException(
                         RB.extraction_exists_notfile.getString(
-                        newFile.getAbsolutePath()));
+                        newFile.getName().getPath()));
             }
 
             // Better to let FileOutputStream creation zero it than to
@@ -409,42 +411,43 @@ public class TarReader {
         }
 
         if (parentDir.exists()) {
-            if (!parentDir.isDirectory()) {
+            if (!parentDir.getType().equals(FileType.FOLDER)) {
                 throw new IOException(
                         RB.extraction_parent_not_dir.getString(
-                        parentDir.getAbsolutePath()));
+                        parentDir.getName().getPath()));
             }
 
-            if (!parentDir.canWrite()) {
+            if (!parentDir.isWriteable()) {
                 throw new IOException(
                         RB.extraction_parent_not_writable.getString(
-                        parentDir.getAbsolutePath()));
+                        		parentDir.getName().getPath()));
             }
         } else {
-            if (!parentDir.mkdirs()) {
+            parentDir.createFolder();
                 throw new IOException(
                         RB.extraction_parent_mkfail.getString(
-                        parentDir.getAbsolutePath()));
-            }
+                        		parentDir.getName().getPath()));
+            
         }
 
         int              fileMode  = header.getFileMode();
-        FileOutputStream outStream = new FileOutputStream(newFile);
+        OutputStream outStream = newFile.getContent().getOutputStream();
 
         try {
 
-//#ifdef JAVA6
+
             // Don't know exactly why I am still able to write to the file
             // after removing read and write privs from myself, but it does
             // work.
+        	/*
             newFile.setExecutable(false, false);
             newFile.setReadable(false, false);
             newFile.setWritable(false, false);
             newFile.setExecutable(((fileMode & 0100) != 0), true);
             newFile.setReadable((fileMode & 0400) != 0, true);
             newFile.setWritable((fileMode & 0200) != 0, true);
+        	 */
 
-//#endif
             while (readBlocks > 0) {
                 readNow = (readBlocks > archive.getReadBufferBlocks())
                           ? archive.getReadBufferBlocks()
@@ -471,13 +474,13 @@ public class TarReader {
             }
         }
 
-        newFile.setLastModified(header.getModTime() * 1000);
+        newFile.getContent().setLastModifiedTime(header.getModTime() * 1000);
 
-        if (newFile.length() != header.getDataSize()) {
+        if (newFile.getContent().getSize() != header.getDataSize()) {
             throw new IOException(RB.write_count_mismatch.getString(
                     Long.toString(header.getDataSize()),
-                    newFile.getAbsolutePath(),
-                    Long.toString(newFile.length())));
+                    newFile.getName().getPath(),
+                    Long.toString(newFile.getContent().getSize())));
         }
     }
 
@@ -620,7 +623,7 @@ public class TarReader {
          * @return a new Absolutized File object generated from this
          * TarEntryHeader.
          */
-        public File generateFile() {
+        public FileObject generateFile() {
 
             if (entryType != '\0' && entryType != '0') {
                 throw new IllegalStateException(
@@ -631,7 +634,12 @@ public class TarReader {
             // privileges here, since those settings have no effect on our
             // new file until after is created by the FileOutputStream
             // constructor.
-            return new File(path);
+            try {
+            	return GAEFileManager.getFile(path);
+            } catch(Exception e)
+            {
+            	return null;
+            }
         }
 
         public char getEntryType() {

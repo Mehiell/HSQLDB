@@ -31,7 +31,7 @@
 
 package org.hsqldb.server;
 /*Peter comment*/
-import java.io.File;
+import org.apache.commons.vfs.FileObject;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
@@ -46,6 +46,7 @@ import org.hsqldb.HsqlDateTime;
 import org.hsqldb.HsqlException;
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
+import org.hsqldb.gae.GAEFileManager;
 import org.hsqldb.lib.ArrayUtil;
 import org.hsqldb.lib.FileUtil;
 import org.hsqldb.lib.HashSet;
@@ -1182,11 +1183,14 @@ public class Server implements HsqlSocketRequestHandler {
     public void setWebRoot(String root) {
 
         checkRunning(false);
+        
+        try {
+        	root = GAEFileManager.getFile(root).getName().getPath();
 
-        root = (new File(root)).getAbsolutePath();
-
-        printWithThread("setWebRoot(" + root + ")");
-
+        	printWithThread("setWebRoot(" + root + ")");
+        } catch(Exception e)
+        {}
+        
         if (serverProtocol != ServerConstants.SC_PROTOCOL_HTTP) {
             return;
         }
@@ -1229,7 +1233,7 @@ public class Server implements HsqlSocketRequestHandler {
             serverProperties.getProperty(ServerConstants.SC_KEY_ACL_FILEPATH);
 
         if (aclFilepath != null) {
-            acl = new ServerAcl(new File(aclFilepath));;
+            acl = new ServerAcl(GAEFileManager.getFile(aclFilepath));;
 
             if (logWriter != null && !isSilent) {
                 acl.setPrintWriter(logWriter);

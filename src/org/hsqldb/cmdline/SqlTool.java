@@ -44,6 +44,9 @@ import java.util.Map;
 import org.hsqldb.lib.FrameworkLogger;
 import org.hsqldb.lib.RCData;
 import org.hsqldb.cmdline.sqltool.Token;
+import org.hsqldb.gae.GAEFileManager;
+
+import org.apache.commons.vfs.FileObject;
 
 /* $Id: SqlTool.java 4141 2011-03-14 01:35:49Z fredt $ */
 
@@ -531,9 +534,7 @@ public class SqlTool {
             }
         } else if (listMode || targetDb != null) {
             try {
-                conData = new RCData(new File((rcFile == null)
-                                              ? DEFAULT_RCFILE
-                                              : rcFile), targetDb);
+               // conData = new RCData(new File((rcFile == null) ? DEFAULT_RCFILE  : rcFile), targetDb);
             } catch (RuntimeException re) {
                 throw re;  // Unrecoverable
             } catch (Exception e) {
@@ -628,7 +629,7 @@ public class SqlTool {
             int fileIndex = 0;
 
             if (autoFile != null) {
-                sqlFiles[fileIndex++] = new SqlFile(autoFile, encoding);
+                //sqlFiles[fileIndex++] = GAEFileManager.getFile(autoFile/* encoding*/);
             }
 
             if (tmpReader != null) {
@@ -640,10 +641,10 @@ public class SqlTool {
                 if (interactiveFileIndex < 0 && interactive) {
                     interactiveFileIndex = fileIndex;
                 }
-
+                /*
                 sqlFiles[fileIndex++] = (scriptFile == null)
                         ?  (new SqlFile(encoding, interactive))
-                        :  (new SqlFile(scriptFile,encoding, interactive));
+                        :  (new SqlFile(scriptFile,encoding, interactive));*/
             }
         } catch (IOException ioe) {
             try {

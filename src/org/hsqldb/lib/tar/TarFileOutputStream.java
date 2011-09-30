@@ -30,12 +30,15 @@
 
 
 package org.hsqldb.lib.tar;
-/*Peter comment*/
-import java.io.File;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
+import org.hsqldb.gae.GAEFileManager;
 
 /**
  * Note that this class <b>is not</b> a java.io.FileOutputStream,
@@ -87,8 +90,8 @@ public class TarFileOutputStream {
     protected int         blocksPerRecord;
     protected long        bytesWritten = 0;
     private OutputStream  writeStream;
-    private File          targetFile;
-    private File          writeFile;
+    private FileObject          targetFile;
+    private FileObject          writeFile;
 
     /* This is not a "Writer", but the byte "Stream" that we write() to. */
     public byte[] writeBuffer;
@@ -104,7 +107,7 @@ public class TarFileOutputStream {
      *
      * @see #TarFileOutputStream(File, int, int)
      */
-    public TarFileOutputStream(File targetFile) throws IOException {
+    public TarFileOutputStream(FileObject targetFile) throws IOException {
         this(targetFile, Compression.DEFAULT_COMPRESSION);
     }
 
@@ -113,7 +116,7 @@ public class TarFileOutputStream {
      *
      * @see #TarFileOutputStream(File, int, int)
      */
-    public TarFileOutputStream(File targetFile,
+    public TarFileOutputStream(FileObject targetFile,
                                int compressionType) throws IOException {
         this(targetFile, compressionType,
              TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD);
@@ -126,34 +129,33 @@ public class TarFileOutputStream {
      *
      * It also overwrites files without warning (just like FileOutputStream).
      */
-    public TarFileOutputStream(File targetFile, int compressionType,
+    public TarFileOutputStream(FileObject targetFile, int compressionType,
                                int blocksPerRecord) throws IOException {
 
         this.blocksPerRecord = blocksPerRecord;
         this.targetFile      = targetFile;
-        writeFile = new File(targetFile.getParentFile(),
-                             targetFile.getName() + "-partial");
+        writeFile = GAEFileManager.getFile(targetFile.getName().getPath() + "/" + targetFile.getName().getBaseName() +  "-partial");
 
         if (this.writeFile.exists()) {
             throw new IOException(
-                    RB.move_work_file.getString(writeFile.getAbsolutePath()));
+                    RB.move_work_file.getString(writeFile.getName().getPath()));
         }
 
-        if (targetFile.exists() && !targetFile.canWrite()) {
+        if (targetFile.exists() && !targetFile.isWriteable()) {
             throw new IOException(
-                    RB.cant_overwrite.getString(targetFile.getAbsolutePath()));
+                    RB.cant_overwrite.getString(targetFile.getName().getPath()));
         }
 
-        File parentDir = targetFile.getAbsoluteFile().getParentFile();
+        FileObject parentDir = targetFile.getParent();
 
-        if (parentDir.exists() && parentDir.isDirectory()) {
-            if (!parentDir.canWrite()) {
+        if (parentDir.exists() && parentDir.getType().equals(FileType.FOLDER)) {
+            if (!parentDir.isWriteable()) {
                 throw new IOException(RB.cant_write_dir.getString(
-                        parentDir.getAbsolutePath()));
+                        parentDir.getName().getPath()));
             }
         } else {
             throw new IOException(
-                    RB.no_parent_dir.getString(parentDir.getAbsolutePath()));
+                    RB.no_parent_dir.getString(parentDir.getName().getPath()));
         }
 
         writeBuffer = new byte[blocksPerRecord * 512];
@@ -161,12 +163,12 @@ public class TarFileOutputStream {
         switch (compressionType) {
 
             case TarFileOutputStream.Compression.NO_COMPRESSION :
-                writeStream = new FileOutputStream(writeFile);
+                writeStream = writeFile.getContent().getOutputStream();
                 break;
 
             case TarFileOutputStream.Compression.GZIP_COMPRESSION :
                 writeStream =
-                    new GZIPOutputStream(new FileOutputStream(writeFile),
+                    new GZIPOutputStream(writeFile.getContent().getOutputStream(),
                                          writeBuffer.length);
                 break;
 
@@ -175,15 +177,16 @@ public class TarFileOutputStream {
                     RB.compression_unknown.getString(compressionType));
         }
 
-//#ifdef JAVA6
+//
+        /*
         writeFile.setExecutable(false, true);
         writeFile.setExecutable(false, false);
         writeFile.setReadable(false, false);
         writeFile.setReadable(true, true);
         writeFile.setWritable(false, false);
         writeFile.setWritable(true, true);
-
-//#endif
+	*/
+//
         // We restrict permissions to the file owner before writing
         // anything, in case we will be writing anything private into this
         // file.
@@ -312,7 +315,7 @@ public class TarFileOutputStream {
             if (!writeFile.delete()) {
                 throw new IOException(
                         RB.workfile_delete_fail.getString(
-                        writeFile.getAbsolutePath()));
+                        writeFile.getName().getPath()));
             }
         } finally {
             writeStream = null;  // Encourage buffer GC
@@ -367,6 +370,6 @@ public class TarFileOutputStream {
         }
 
         writeStream.close();
-        writeFile.renameTo(targetFile);
+        writeFile.canRenameTo(targetFile);
     }
 }

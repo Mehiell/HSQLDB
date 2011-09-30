@@ -30,9 +30,9 @@
 
 
 package org.hsqldb.lib.tar;
-/*Peter comment*/
+
 import java.io.ByteArrayInputStream;
-import java.io.File;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -43,6 +43,9 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hsqldb.gae.GAEFileManager;
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
 import org.hsqldb.lib.StringUtil;
 
 /**
@@ -66,13 +69,13 @@ public class TarGenerator {
             System.exit(0);
         }
 
-        TarGenerator generator = new TarGenerator(new File(sa[0]), true, null);
+        TarGenerator generator = new TarGenerator(GAEFileManager.getFile(sa[0]), true, null);
 
         if (sa.length == 1) {
             generator.queueEntry("stdin", System.in, 10240);
         } else {
             for (int i = 1; i < sa.length; i++) {
-                generator.queueEntry(new File(sa[i]));
+                generator.queueEntry(GAEFileManager.getFile(sa[i]));
             }
         }
 
@@ -118,51 +121,51 @@ public class TarGenerator {
      * @param overWrite    True to replace an existing file of same path.
      * @param blocksPerRecord  Null will use default tar value.
      */
-    public TarGenerator(File inFile, boolean overWrite,
+    public TarGenerator(FileObject inFile, boolean overWrite,
                         Integer blocksPerRecord) throws IOException {
 
-        File archiveFile = inFile.getAbsoluteFile();
+        FileObject archiveFile = inFile;
 
         // Do this so we can be sure .getParent*() is non-null.  (Also allows
         // us to use .getPath() instead of very long .getAbsolutePath() for
         // error messages.
         int compression = TarFileOutputStream.Compression.NO_COMPRESSION;
 
-        if (archiveFile.getName().endsWith(".tgz")
-                || archiveFile.getName().endsWith(".tar.gz")) {
+        if (archiveFile.getName().getBaseName().endsWith(".tgz")
+                || archiveFile.getName().getBaseName().endsWith(".tar.gz")) {
             compression = TarFileOutputStream.Compression.GZIP_COMPRESSION;
-        } else if (archiveFile.getName().endsWith(".tar")) {
+        } else if (archiveFile.getName().getBaseName().endsWith(".tar")) {
 
             // purposefully do nothing
         } else {
             throw new IllegalArgumentException(RB.unsupported_ext.getString(
-                    getClass().getName(), archiveFile.getPath()));
+                    getClass().getName(), archiveFile.getName().getPath()));
         }
 
         if (archiveFile.exists()) {
             if (!overWrite) {
                 throw new IOException(
-                        RB.dest_exists.getString(archiveFile.getPath()));
+                        RB.dest_exists.getString(archiveFile.getName().getPath()));
             }
         } else {
-            File parentDir = archiveFile.getParentFile();
+            FileObject parentDir = archiveFile.getParent();
 
             // parentDir will be absolute, since archiveFile is absolute.
             if (parentDir.exists()) {
-                if (!parentDir.isDirectory()) {
+                if (!parentDir.getType().equals(FileType.FOLDER)) {
                     throw new IOException(
-                        RB.parent_not_dir.getString(parentDir.getPath()));
+                        RB.parent_not_dir.getString(parentDir.getName().getPath()));
                 }
 
-                if (!parentDir.canWrite()) {
+                if (!parentDir.isWriteable()) {
                     throw new IOException(
-                        RB.cant_write_parent.getString(parentDir.getPath()));
+                        RB.cant_write_parent.getString(parentDir.getName().getPath()));
                 }
             } else {
-                if (!parentDir.mkdirs()) {
+            	parentDir.createFolder();
                     throw new IOException(
-                        RB.parent_create_fail.getString(parentDir.getPath()));
-                }
+                        RB.parent_create_fail.getString(parentDir.getName().getPath()));
+                
             }
         }
 
@@ -177,13 +180,13 @@ public class TarGenerator {
         }
     }
 
-    public void queueEntry(File file)
+    public void queueEntry(FileObject file)
     throws FileNotFoundException, TarMalformatException {
         queueEntry(null, file);
     }
 
     public void queueEntry(String entryPath,
-                           File file)
+                           FileObject file)
                            throws FileNotFoundException,
                                   TarMalformatException {
         entryQueue.add(new TarEntrySupplicant(entryPath, file, archive));
@@ -418,7 +421,7 @@ public class TarGenerator {
         public TarEntrySupplicant makeXentry()
         throws IOException, TarMalformatException {
 
-            PIFGenerator pif = new PIFGenerator(new File(path));
+            PIFGenerator pif = new PIFGenerator(GAEFileManager.getFile(path));
 
             pif.addRecord("size", dataSize);
 
@@ -445,14 +448,14 @@ public class TarGenerator {
          * write() or close(), to release system resources on the input
          * File/Stream.
          */
-        public TarEntrySupplicant(String path, File file,
+        public TarEntrySupplicant(String path, FileObject file,
                                   TarFileOutputStream tarStream)
                                   throws FileNotFoundException,
                                          TarMalformatException {
 
             // Must use an expression-embedded ternary here to satisfy compiler
             // that this() call be first statement in constructor.
-            this(((path == null) ? file.getPath()
+            this(((path == null) ? file.getName().getPath()
                                  : path), '0', tarStream);
 
             // Difficult call for '0'.  binary 0 and character '0' both mean
@@ -460,20 +463,24 @@ public class TarGenerator {
             // but we are writing a valid UStar header, and I doubt anybody's
             // tar implementation would choke on this since there is no
             // outcry of UStar archives failing to work with older tars.
-            if (!file.isFile()) {
-                throw new IllegalArgumentException(
-                        RB.nonfile_entry.getString());
+            try {
+	            if (!file.getType().equals(FileType.FILE)) {
+	                throw new IllegalArgumentException(
+	                        RB.nonfile_entry.getString());
+	            }
+	
+	            if (!file.isReadable()) {
+	                throw new IllegalArgumentException(
+	                    RB.read_denied.getString(file.getName().getPath()));
+	            }
+	
+	            modTime     = file.getContent().getLastModifiedTime() / 1000L;
+	            fileMode    = TarEntrySupplicant.getLameMode(file);
+	            dataSize    = file.getContent().getSize();
+	            inputStream = file.getContent().getInputStream();
+            } catch(Exception e) {
+            	e.printStackTrace();
             }
-
-            if (!file.canRead()) {
-                throw new IllegalArgumentException(
-                    RB.read_denied.getString(file.getAbsolutePath()));
-            }
-
-            modTime     = file.lastModified() / 1000L;
-            fileMode    = TarEntrySupplicant.getLameMode(file);
-            dataSize    = file.length();
-            inputStream = new FileInputStream(file);
         }
 
         /**
@@ -660,16 +667,17 @@ public class TarGenerator {
          * to detect the same.
          * </P>
          */
-        static protected String getLameMode(File file) {
-
+        static protected String getLameMode(FileObject file) {
+        	
+        	return "0700";
+        	/*
             int umod = 0;
 
-//#ifdef JAVA6
+
             if (file.canExecute()) {
                 umod = 1;
             }
 
-//#endif
             if (file.canWrite()) {
                 umod += 2;
             }
@@ -679,7 +687,7 @@ public class TarGenerator {
             }
 
             return "0" + umod + "00";
-
+	*/
             // Conservative since Java gives us no way to determine group or
             // other privileges on a file, and this file may contain passwords.
         }

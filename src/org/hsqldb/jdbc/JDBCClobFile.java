@@ -54,7 +54,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
 import java.sql.Clob;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
+//import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

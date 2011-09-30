@@ -343,8 +343,8 @@ implements ActionListener, WindowListener, KeyListener {
                     rcFile = DEFAULT_RCFILE;
                 }
 
-                c = new RCData(new File(rcFile), urlid).getConnection(null,
-                               System.getProperty("javax.net.ssl.trustStore"));
+                //c = new RCData(new File(rcFile), urlid).getConnection(null,
+                //               System.getProperty("javax.net.ssl.trustStore"));
             } else {
                 c = ConnectionDialog.createConnection(m.fMain, "Connect");
             }
@@ -1052,7 +1052,7 @@ implements ActionListener, WindowListener, KeyListener {
 
         try {
             File      file   = new File(filename);
-            CSVWriter writer = new CSVWriter(file, null);
+            CSVWriter writer = null;//new CSVWriter(file, null);
             String[]  col    = gResult.getHead();
             int       width  = col.length;
             Vector    data   = gResult.getData();

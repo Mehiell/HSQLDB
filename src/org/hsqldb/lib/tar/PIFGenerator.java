@@ -30,14 +30,15 @@
 
 
 package org.hsqldb.lib.tar;
-/*Peter comment*/
+
 import java.io.ByteArrayOutputStream;
-import java.io.File;
+
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Date;
 
+import org.apache.commons.vfs.FileObject;
 /**
  * Encapsulates Pax Interchange Format key/value pairs.
  */
@@ -92,17 +93,21 @@ public class PIFGenerator extends ByteArrayOutputStream {
      *
      * @param file Target file of the x record.
      */
-    public PIFGenerator(File file) {
+    public PIFGenerator(FileObject file) {
 
         this();
 
         typeFlag = 'x';
-
-        String parentPath = (file.getParentFile() == null) ? "."
-                                                           : file.getParentFile()
+        
+        try {
+        	String parentPath = (file.getParent() == null) ? "."
+                                                           : file.getParent().getName()
                                                                .getPath();
 
-        name = parentPath + "/PaxHeaders." + fakePid + '/' + file.getName();
+        	name = parentPath + "/PaxHeaders." + fakePid + '/' + file.getName();
+        	
+        } catch (Exception e) 
+        {}
     }
 
     /**

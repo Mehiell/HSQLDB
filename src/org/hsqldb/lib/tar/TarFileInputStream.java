@@ -30,14 +30,15 @@
 
 
 package org.hsqldb.lib.tar;
-/*Peter comment*/
+
 import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.vfs.FileObject;
+import org.apache.commons.vfs.FileType;
 
 /**
  * Note that this class <b>is not</b> a java.io.FileInputStream,
@@ -91,7 +92,7 @@ public class TarFileInputStream {
      *
      * @see #TarFileInputStream(File, int, int)
      */
-    public TarFileInputStream(File sourceFile) throws IOException {
+    public TarFileInputStream(FileObject sourceFile) throws IOException {
         this(sourceFile, TarFileOutputStream.Compression.DEFAULT_COMPRESSION);
     }
 
@@ -100,7 +101,7 @@ public class TarFileInputStream {
      *
      * @see #TarFileInputStream(File, int, int)
      */
-    public TarFileInputStream(File sourceFile,
+    public TarFileInputStream(FileObject sourceFile,
                               int compressionType) throws IOException {
         this(sourceFile, compressionType,
              TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD);
@@ -124,16 +125,16 @@ public class TarFileInputStream {
      * @see #close()
      * @see #readNextHeaderBlock()
      */
-    public TarFileInputStream(File sourceFile, int compressionType,
+    public TarFileInputStream(FileObject sourceFile, int compressionType,
                               int readBufferBlocks) throws IOException {
 
-        if (!sourceFile.isFile()) {
-            throw new FileNotFoundException(sourceFile.getAbsolutePath());
+        if (!sourceFile.getType().equals(FileType.FILE)) {
+            throw new FileNotFoundException(sourceFile.getName().getPath());
         }
 
-        if (!sourceFile.canRead()) {
+        if (!sourceFile.isReadable()) {
             throw new IOException(
-                    RB.read_denied.getString(sourceFile.getAbsolutePath()));
+                    RB.read_denied.getString(sourceFile.getName().getPath()));
         }
 
         this.readBufferBlocks = readBufferBlocks;
@@ -143,12 +144,12 @@ public class TarFileInputStream {
         switch (compressionType) {
 
             case TarFileOutputStream.Compression.NO_COMPRESSION :
-                readStream = new FileInputStream(sourceFile);
+                readStream = sourceFile.getContent().getInputStream();
                 break;
 
             case TarFileOutputStream.Compression.GZIP_COMPRESSION :
                 readStream =
-                    new GZIPInputStream(new FileInputStream(sourceFile),
+                    new GZIPInputStream(sourceFile.getContent().getInputStream(),
                                         readBuffer.length);
                 break;
 

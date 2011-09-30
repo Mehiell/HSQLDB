@@ -33,6 +33,7 @@ package org.hsqldb.lib.tar;
 /*Peter comment*/
 
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.IOException;
 import java.util.Properties;
 
@@ -105,7 +106,7 @@ public class DbBackup {
                     throw new IllegalArgumentException();
                 }
 
-                DbBackup backup = new DbBackup(new File(sa[sa.length - 2]),
+                DbBackup backup = new DbBackup(GAEFileManager.getFile(sa[sa.length - 2]),
                                                sa[sa.length - 1]);
 
                 backup.setOverWrite(overWrite);
@@ -125,9 +126,9 @@ public class DbBackup {
                     }
                 }
 
-                new TarReader(new File(sa[1]), TarReader
+                new TarReader(GAEFileManager.getFile(sa[1]), TarReader
                     .LIST_MODE, patternStrings, new Integer(DbBackup
-                        .generateBufferBlockValue(new File(sa[1]))), null)
+                        .generateBufferBlockValue(GAEFileManager.getFile(sa[1]))), null)
                             .read();
             } else if (sa[0].equals("--extract")) {
                 boolean overWrite = sa.length > 1
@@ -149,7 +150,7 @@ public class DbBackup {
                     }
                 }
 
-                File tarFile       = new File(sa[overWrite ? 2
+                FileObject tarFile       = GAEFileManager.getFile(sa[overWrite ? 2
                                                            : 1]);
                 int  tarReaderMode = overWrite ? TarReader.OVERWRITE_MODE
                                                : TarReader.EXTRACT_MODE;
@@ -157,7 +158,7 @@ public class DbBackup {
                 new TarReader(
                     tarFile, tarReaderMode, patternStrings,
                     new Integer(DbBackup.generateBufferBlockValue(tarFile)),
-                    new File(sa[firstPatInd - 1])).read();
+                    GAEFileManager.getFile(sa[firstPatInd - 1])).read();
             } else {
                 throw new IllegalArgumentException();
             }
@@ -236,14 +237,14 @@ public class DbBackup {
      */
     public void write() throws IOException, TarMalformatException {
 
-        FileObject   propertiesFile = new File(dbDir, instanceName + ".properties");
-        FileObject   scriptFile     = new File(dbDir, instanceName + ".script");
+        FileObject   propertiesFile = GAEFileManager.getFile(dbDir + "/" + instanceName + ".properties");
+        FileObject   scriptFile     = GAEFileManager.getFile(dbDir + "/" +  instanceName + ".script");
         FileObject[] componentFiles = new FileObject[] {
             propertiesFile, scriptFile,
-            new FileObject(dbDir, instanceName + ".backup"),
-            new File(dbDir, instanceName + ".data"),
-            new File(dbDir, instanceName + ".log"),
-            new File(dbDir, instanceName + ".lobs")
+            GAEFileManager.getFile(dbDir + "/" + instanceName + ".backup"),
+            GAEFileManager.getFile(dbDir +"/" + instanceName + ".data"),
+            GAEFileManager.getFile(dbDir + "/" + instanceName + ".log"),
+            GAEFileManager.getFile(dbDir + "/" +  instanceName + ".lobs")
         };
         boolean[] existList = new boolean[componentFiles.length];
         long      startTime = new java.util.Date().getTime();
@@ -256,16 +257,16 @@ public class DbBackup {
                 // First 2 files are REQUIRED
                 throw new FileNotFoundException(
                         RB.file_missing.getString(
-                        componentFiles[i].getAbsolutePath()));
+                        componentFiles[i].getName().getPath()));
             }
         }
 
         if (abortUponModify) {
             Properties      p   = new Properties();
-            FileInputStream fis = null;
+            InputStream fis = null;
 
             try {
-                fis = new FileInputStream(propertiesFile);
+                fis = propertiesFile.getContent().getInputStream();
 
                 p.load(fis);
             } finally {
@@ -291,7 +292,7 @@ public class DbBackup {
         TarGenerator generator = new TarGenerator(archiveFile, overWrite,
             new Integer(DbBackup.generateBufferBlockValue(componentFiles)));
 
-        for (File componentFile : componentFiles) {
+        for (FileObject componentFile : componentFiles) {
             if (!componentFile.exists()) {
                 continue;
 
@@ -299,7 +300,7 @@ public class DbBackup {
                 // there is no error condition here.
             }
 
-            generator.queueEntry(componentFile.getName(), componentFile);
+            generator.queueEntry(componentFile.getName().getBaseName(), componentFile);
         }
 
         generator.write();
@@ -311,25 +312,25 @@ public class DbBackup {
                         if (!existList[i]) {
                             throw new FileNotFoundException(
                                     RB.file_disappeared.getString(
-                                    componentFiles[i].getAbsolutePath()));
+                                    componentFiles[i].getName().getPath()));
                         }
 
-                        if (componentFiles[i].lastModified() > startTime) {
+                        if (componentFiles[i].getContent().getLastModifiedTime() > startTime) {
                             throw new FileNotFoundException(
                                     RB.file_changed.getString(
-                                    componentFiles[i].getAbsolutePath()));
+                                    		componentFiles[i].getName().getPath()));
                         }
                     } else if (existList[i]) {
                         throw new FileNotFoundException(
                                 RB.file_appeared.getString(
-                                componentFiles[i].getAbsolutePath()));
+                                		componentFiles[i].getName().getPath()));
                     }
                 }
             } catch (IllegalStateException ise) {
                 if (!archiveFile.delete()) {
                     System.out.println(
                             RB.cleanup_rmfail.getString(
-                            archiveFile.getAbsolutePath()));
+                            archiveFile.getName().getPath()));
 
                     // Be-it-known.  This method can write to stderr if
                     // abortUponModify is true.
@@ -382,17 +383,20 @@ public class DbBackup {
     static protected int generateBufferBlockValue(FileObject[] files) {
 
         long maxFileSize = 0;
-
-        for (FileObject file : files) {
-            if (file == null) {
-                continue;
-            }
-
-            if (file.getContent().getSize() > maxFileSize) {
-                maxFileSize = file.getContent().getSize() ;
-            }
-        }
-
+        
+        try {
+	        for (FileObject file : files) {
+	            if (file == null) {
+	                continue;
+	            }
+	
+	            if (file.getContent().getSize() > maxFileSize) {
+	                maxFileSize = file.getContent().getSize() ;
+	            }
+	        }
+        } catch (Exception e)
+        {}
+        
         int idealBlocks = (int) (maxFileSize / (10L * 512L));
 
         // I.e., 1/10 of the file, in units of 512 byte blocks.

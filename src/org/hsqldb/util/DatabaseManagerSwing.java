@@ -564,10 +564,9 @@ implements ActionListener, WindowListener, KeyListener, MouseListener {
 
                 String rcfilepath = (rcFile == null) ? DEFAULT_RCFILE
                                                      : rcFile;
-                RCData rcdata     = new RCData(new File(rcfilepath), urlid);
+                //RCData rcdata     = new RCData(new File(rcfilepath), urlid);
 
-                c = rcdata.getConnection(
-                    null, System.getProperty("javax.net.ssl.trustStore"));
+                //c = rcdata.getConnection( null, System.getProperty("javax.net.ssl.trustStore"));
             } else {
                 c = ConnectionDialogSwing.createConnection(m.jframe,
                         "Connect");

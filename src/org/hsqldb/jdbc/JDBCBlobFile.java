@@ -42,7 +42,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.Blob;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
+//import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
