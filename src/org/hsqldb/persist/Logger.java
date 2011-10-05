@@ -87,6 +87,8 @@ import org.hsqldb.types.Type;
  */
 public class Logger {
 
+	private static final java.util.logging.Logger thelog = java.util.logging.Logger.getLogger(Logger.class.getName());
+	
     public SimpleLog appLog;
     private Database database;
     public boolean   checkpointRequired;
@@ -300,6 +302,7 @@ public class Logger {
         boolean useLock = database.getProperties().isPropertyTrue(
             HsqlDatabaseProperties.hsqldb_lock_file);
 
+        thelog.info("To uselock database.getPath=" + database.getPath());
         if (useLock && !database.isFilesReadOnly()) {
             acquireLock(database.getPath());
         }

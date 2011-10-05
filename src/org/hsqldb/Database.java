@@ -65,6 +65,8 @@ import org.hsqldb.types.Type;
  */
 public class Database {
 
+	private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(Database.class.getName());
+	
     int                        databaseID;
     String                     databaseUniqueName;
     String                     databaseType;
@@ -175,6 +177,8 @@ public class Database {
         shutdownOnNoConnection =
             urlProperties.isPropertyTrue(HsqlDatabaseProperties.url_shutdown);
         lobManager = new LobManager(this);
+        
+        log.info("Database.new type=" + type + " path=" + path + " canonicalPath=" + canonicalPath + " props=" + props);
     }
 
     /**

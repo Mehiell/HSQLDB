@@ -362,6 +362,8 @@ import org.hsqldb.lib.StringConverter;
  */
 public class LockFile {
 
+	private static final java.util.logging.Logger thelog = java.util.logging.Logger.getLogger(LockFile.class.getName());
+	
     /**
      * Arbitary period, in milliseconds, at which heartbeat timestamps are
      * written to this object's lock file. <p>
@@ -607,7 +609,7 @@ public class LockFile {
         }
 
         lockFile.setPath(path);
-
+        thelog.info("LockFile.newLockFile path=" + path + " lockFile=" + lockFile);
         return lockFile;
     }
 
@@ -629,8 +631,9 @@ public class LockFile {
     public static final LockFile newLockFileLock(final String path)
     throws HsqlException {
 
+    	thelog.info("LockFile.newLockFileLock path=" + path);
         LockFile lockFile = null;
-
+        
         try {
             lockFile = LockFile.newLockFile(path + ".lck");
         } catch (LockFile.BaseException e) {
@@ -1045,10 +1048,11 @@ public class LockFile {
 
         // Should at least be absolutized for reporting purposes, just in case
         // a security or canonicalization exception gets thrown.
-        path      = FileUtil.getFileUtil().canonicalOrAbsolutePath(path);
+        //path      = FileUtil.getFileUtil().canonicalOrAbsolutePath(path);
         
         try {
         	this.file = GAEFileManager.getFile(path);
+        	thelog.info("LockFile.setPath path=" + path + "this.file=" + this.file);
             FileUtil.getFileUtil().makeParentDirectories(this.file);
         } catch (FileSystemException fsx) {
             throw new FileSecurityException(this, "setPath", null);
@@ -1056,6 +1060,7 @@ public class LockFile {
             throw new FileSecurityException(this, "setPath", ex);
         }
 
+        /*
         try {
             this.file = FileUtil.getFileUtil().canonicalFile(path);
         } catch (SecurityException ex) {
@@ -1063,7 +1068,7 @@ public class LockFile {
         } catch (IOException ex) {
             throw new FileCanonicalizationException(this, "setPath", ex);
         }
-
+         */
         this.cpath = this.file.getName().getPath();
     }
 

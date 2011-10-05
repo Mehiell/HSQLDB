@@ -18,12 +18,12 @@ public class GAEFileManager {
 	private static Boolean  isInitialized  = false;
 	private static FileSystemManager fsManager = null;
 	
-	private static void init() {
+	public static void init(String root) {
 		if(!isInitialized) {
 			synchronized(isInitialized) {
 				try
 				{
-					GaeVFS.setRootPath("/");
+					GaeVFS.setRootPath(root);
 					fsManager = GaeVFS.getManager();
 
 
@@ -37,9 +37,14 @@ public class GAEFileManager {
 			}
 		}
 	}
+	
+	public static void close() {
+		GaeVFS.clearFilesCache();
+		GaeVFS.close();
+	}
 		
 	public static FileObject getFile(String filename) throws FileSystemException {
-		init();
+		//init();
 		FileObject file = fsManager.resolveFile("gae://" + filename);
 		return file;
 	}

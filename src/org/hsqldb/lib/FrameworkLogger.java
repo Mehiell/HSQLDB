@@ -40,9 +40,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.logging.ConsoleHandler;
+//import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
-import java.util.logging.LogManager;
+//import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 import org.apache.commons.vfs.FileObject;
@@ -106,7 +106,7 @@ public class FrameworkLogger {
     private Object         log4jLogger;
     private Logger         jdkLogger;
     static private boolean haveLoadedOurDefault;
-    static private ConsoleHandler  consoleHandler = new ConsoleHandler();
+   // static private ConsoleHandler  consoleHandler = new ConsoleHandler();
     // No need for more than one static, since we have only one console
 
     static {
@@ -155,22 +155,19 @@ public class FrameworkLogger {
         if (log4jLoggerClass == null) try {
             log4jGetLogger = null;
             log4jLogMethod = null;
-            LogManager lm = LogManager.getLogManager();
+           // LogManager lm = LogManager.getLogManager();
             if (haveLoadedOurDefault || isDefaultJdkConfig()) {
                 haveLoadedOurDefault = true;
-                consoleHandler.setFormatter(
-                        new BasicTextJdkLogFormatter(false));
-                consoleHandler.setLevel(Level.INFO);
-                lm.readConfiguration(
-                        FrameworkLogger.class.getResourceAsStream(
-                        "/org/hsqldb/resources/jdklogging-default.properties"));
+                //consoleHandler.setFormatter(new BasicTextJdkLogFormatter(false));
+                //consoleHandler.setLevel(Level.INFO);
+                //lm.readConfiguration(FrameworkLogger.class.getResourceAsStream("/org/hsqldb/resources/jdklogging-default.properties"));
                 Logger cmdlineLogger = Logger.getLogger("org.hsqldb.cmdline");
-                cmdlineLogger.addHandler(consoleHandler);
+                //cmdlineLogger.addHandler(consoleHandler);
                 cmdlineLogger.setUseParentHandlers(false);
             } else {
                 // Do not intervene.  Use JDK logging exactly as configured by
                 // user.
-                lm.readConfiguration();
+                //lm.readConfiguration();
                 // The only bad thing about doing this is that if the app has
                 // programmatically changed the logging config after starting
                 // the program but before using FrameworkLogger, we will
@@ -513,7 +510,7 @@ public class FrameworkLogger {
     		return false;
     	}
         InputStream fis = null;
-        LogManager lm = LogManager.getLogManager();
+        //LogManager lm = LogManager.getLogManager();
         try {
             fis = globalCfgFile.getContent().getInputStream();
             Properties defaultProps = new Properties();
@@ -525,13 +522,13 @@ public class FrameworkLogger {
             while (names.hasMoreElements()) {
                 i++;
                 name = (String) names.nextElement();
-                liveVal = lm.getProperty(name);
-                if (liveVal == null) {
-                    return false;
-                }
-                if (!lm.getProperty(name).equals(liveVal)) {
-                    return false;
-                }
+                //liveVal = lm.getProperty(name);
+               // if (liveVal == null) {
+               //     return false;
+                //}
+               // if (!lm.getProperty(name).equals(liveVal)) {
+               //     return false;
+               // }
             }
             return true;
         } catch (IOException ioe) {

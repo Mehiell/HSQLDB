@@ -32,10 +32,10 @@
 package org.hsqldb;
 
 import java.util.Vector;
+import java.util.logging.Logger;
 
 import org.hsqldb.error.Error;
 import org.hsqldb.error.ErrorCode;
-import org.hsqldb.lib.FileUtil;
 import org.hsqldb.lib.HashMap;
 import org.hsqldb.lib.HashSet;
 import org.hsqldb.lib.HsqlTimer;
@@ -63,6 +63,8 @@ import org.hsqldb.store.ValuePool;
  */
 public class DatabaseManager {
 
+	private static final Logger log =
+		      Logger.getLogger(DatabaseManager.class.getName());
     // Database and Server registry
 
     /** provides unique ID's for the Databases currently in registry */
@@ -154,6 +156,7 @@ public class DatabaseManager {
                                      String password, HsqlProperties props,
                                      String zoneString, int timeZoneSeconds) {
 
+    	log.info("DatabaseManager.newSession type=" + type + " path=" + path + " user=" + user  + " props=" + props);
         Database db = getDatabase(type, path, props);
 
         if (db == null) {
@@ -300,6 +303,7 @@ public class DatabaseManager {
 
         if (db == null) {
             db            = new Database(type, path, key, props);
+            log.info("DatabaseManager.getDatabase type=" + type + " key=" + key + " path="+path + " props=" + props);
             db.databaseID = dbIDCounter;
 
             synchronized (databaseIDMap) {
@@ -501,7 +505,8 @@ public class DatabaseManager {
     private static String filePathToKey(String path) {
 
         try {
-            return FileUtil.getFileUtil().canonicalPath(path);
+            //return FileUtil.getFileUtil().canonicalPath(path);
+        	return path;
         } catch (Exception e) {
             return path;
         }
